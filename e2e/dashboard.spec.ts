@@ -69,17 +69,8 @@ test.describe("Desktop (1440x900)", () => {
 
   test("hamburger menu is hidden", async ({ page }) => {
     await page.goto("/");
-    // The md:hidden button should not be visible on desktop
-    const buttons = page.locator("header button");
-    const count = await buttons.count();
-    for (let i = 0; i < count; i++) {
-      const btn = buttons.nth(i);
-      if (await btn.isVisible()) {
-        // If a button is visible, it shouldn't be the hamburger
-        const classes = await btn.getAttribute("class");
-        expect(classes).not.toContain("md:hidden");
-      }
-    }
+    const menuButton = page.locator('header button[aria-label="פתח תפריט"]');
+    await expect(menuButton).toBeHidden();
   });
 
   test("summary cards are in a wide grid", async ({ page }) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -34,8 +34,19 @@ export function Header() {
   const pathname = usePathname();
   const title = pageTitles[pathname] || "FinDash";
   const [open, setOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   const close = useCallback(() => setOpen(false), []);
+
+  // Native event listener for Safari compatibility
+  useEffect(() => {
+    const btn = menuBtnRef.current;
+    if (!btn) return;
+
+    const handler = () => setOpen(true);
+    btn.addEventListener("click", handler);
+    return () => btn.removeEventListener("click", handler);
+  }, []);
 
   // Close on route change
   useEffect(() => {
@@ -56,19 +67,24 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex items-center h-16 px-4 md:px-6 bg-background border-b border-border">
-        {/* Mobile menu button */}
+      <header
+        className="sticky top-0 z-40 flex items-center h-16 px-4 md:px-6 bg-background border-b border-border"
+        style={{ WebkitTransform: "translateZ(0)" }}
+      >
+        {/* Mobile menu button - using native ref for Safari */}
         <button
+          ref={menuBtnRef}
           type="button"
-          className="md:hidden ml-2 flex items-center justify-center h-11 w-11 rounded-lg hover:bg-accent active:bg-accent/80 transition-colors -webkit-tap-highlight-color-transparent"
-          onClick={() => setOpen(true)}
-          onTouchEnd={(e) => {
-            e.preventDefault();
-            setOpen(true);
-          }}
           aria-label="פתח תפריט"
+          className="md:hidden ml-2 rounded-lg flex items-center justify-center w-11 h-11"
+          style={{
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+            WebkitAppearance: "none",
+            touchAction: "manipulation",
+          }}
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-5 w-5 pointer-events-none" />
         </button>
 
         {/* Page title */}
@@ -77,19 +93,23 @@ export function Header() {
 
       {/* Mobile sidebar overlay */}
       {open && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          role="dialog"
+          aria-modal="true"
+        >
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/40"
             onClick={close}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              close();
-            }}
+            style={{ touchAction: "manipulation", cursor: "pointer" }}
           />
 
           {/* Sidebar panel */}
-          <nav className="fixed inset-y-0 right-0 w-64 bg-background shadow-xl flex flex-col animate-in slide-in-from-right duration-200">
+          <nav
+            className="fixed inset-y-0 right-0 w-64 bg-background shadow-xl flex flex-col"
+            style={{ WebkitTransform: "translateZ(0)" }}
+          >
             {/* Header */}
             <div className="flex items-center justify-between h-16 px-4 border-b border-border">
               <div className="flex items-center">
@@ -98,15 +118,21 @@ export function Header() {
               </div>
               <button
                 type="button"
-                className="flex items-center justify-center h-11 w-11 rounded-lg hover:bg-accent active:bg-accent/80"
-                onClick={close}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  close();
-                }}
                 aria-label="סגור תפריט"
+                onClick={close}
+                className="rounded-lg"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 44,
+                  height: 44,
+                  cursor: "pointer",
+                  WebkitTapHighlightColor: "transparent",
+                  touchAction: "manipulation",
+                }}
               >
-                <X className="h-5 w-5" />
+                <X className="h-5 w-5 pointer-events-none" />
               </button>
             </div>
 
@@ -129,10 +155,10 @@ export function Header() {
                         : "text-foreground/70 hover:bg-accent/50 hover:text-foreground"
                     )}
                   >
-                    <item.icon className="h-5 w-5 shrink-0" />
+                    <item.icon className="h-5 w-5 shrink-0 pointer-events-none" />
                     <span>{item.label}</span>
                     {isActive && (
-                      <ChevronRight className="h-4 w-4 mr-auto rotate-180" />
+                      <ChevronRight className="h-4 w-4 mr-auto rotate-180 pointer-events-none" />
                     )}
                   </Link>
                 );
