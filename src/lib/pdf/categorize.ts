@@ -43,18 +43,24 @@ export function detectCategory(text: string): string {
 
 /**
  * Extracts amount (₪) from invoice text.
- * Looks for patterns like: ₪123.45, 123.45 ₪, סה"כ 123.45, total: 123.45
+ * Prioritizes "סה"כ כולל מע"מ" which is the final total on Israeli invoices.
  */
 export function extractAmount(text: string): number | null {
-  // Try common Hebrew invoice patterns
   const patterns = [
-    // סה"כ לתשלום: 123.45
-    /(?:סה["\u05F4]כ|סהכ|סה"כ|total|לתשלום|לחיוב|סכום)[:\s]*[₪]?\s*([\d,]+\.?\d*)/i,
+    // סה"כ כולל מע"מ 30.00 (most reliable - final total)
+    /סה"כ\s+כולל\s+מע["\u05F4]?מ\s*([\d,]+\.?\d*)/i,
+    /סה"כ\s+כולל\s+מע.?[םמ]\s*([\d,]+\.?\d*)/i,
+    // סה"כ לתשלום - דלקים 30.00
+    /סה"כ\s+לתשלום\s*[-–]\s*\S+\s*([\d,]+\.?\d*)/i,
+    // סה"כ לתשלום 123.45
+    /סה"כ\s+לתשלום[:\s]*([\d,]+\.?\d*)/i,
+    // התקבל: מזומן 30.00 / התקבל: אשראי 30.00
+    /התקבל[:\s]+\S+\s*([\d,]+\.?\d*)/i,
+    // לחיוב / סכום
+    /(?:לחיוב|סכום)[:\s]*[₪]?\s*([\d,]+\.?\d*)/i,
     // ₪123.45 or 123.45₪
     /₪\s*([\d,]+\.?\d*)/,
     /([\d,]+\.?\d*)\s*₪/,
-    // Last resort: any number that looks like money (with decimal)
-    /\b([\d,]+\.\d{2})\b/,
   ];
 
   for (const pattern of patterns) {
@@ -101,7 +107,7 @@ export function extractDate(text: string): Date | null {
 
 /**
  * Extracts vendor/business name from invoice text.
- * Looks at the first few lines which usually contain the business name.
+ * Skips common header lines and looks for the business name.
  */
 export function extractVendor(text: string): string | null {
   const lines = text
@@ -109,12 +115,18 @@ export function extractVendor(text: string): string | null {
     .map((l) => l.trim())
     .filter((l) => l.length > 2 && l.length < 60);
 
-  // Usually the business name is in the first 3 non-empty lines
-  for (const line of lines.slice(0, 5)) {
-    // Skip lines that are mostly numbers or dates
-    if (/^\d+[/\-.\s\d]*$/.test(line)) continue;
-    // Skip lines with common non-name content
-    if (/(?:חשבונית|מס'|תאריך|עוסק|ח\.פ|טלפון|כתובת|מע"מ)/i.test(line)) continue;
+  // Lines to skip - common invoice headers that aren't vendor names
+  const skipPatterns = [
+    /^[-=*]+$/,                          // separator lines
+    /^\d+[/\-.\s\d]*$/,                 // pure numbers/dates
+    /(?:חשבונית|מס'|תאריך|עוסק|ח\.פ|טלפון|כתובת|מע"מ)/i,
+    /(?:במסמך|ממוחשב|מקור|העתק|מקורי|נאמן)/i,  // document type headers
+    /^--/,                               // separator
+  ];
+
+  for (const line of lines.slice(0, 8)) {
+    const shouldSkip = skipPatterns.some((p) => p.test(line));
+    if (shouldSkip) continue;
 
     return line;
   }
