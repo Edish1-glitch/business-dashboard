@@ -61,7 +61,6 @@ export default function PendingInvoicesPage() {
   const [approving, setApproving] = useState<string | null>(null);
   const [approvingAll, setApprovingAll] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const [lightboxId, setLightboxId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -343,7 +342,7 @@ export default function PendingInvoicesPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setLightboxId(inv.id)}
+                        onClick={() => setPreviewId(previewId === inv.id ? null : inv.id)}
                         title="תצוגה מקדימה"
                       >
                         <Eye className="h-4 w-4" />
@@ -369,7 +368,17 @@ export default function PendingInvoicesPage() {
                   </div>
                   </div>
 
-                  {/* Quick Look removed - using fullscreen lightbox instead */}
+                  {/* Inline Preview - scrollable with full-width image */}
+                  {previewId === inv.id && (
+                    <div className="rounded-xl border border-border overflow-auto bg-white max-h-[500px]">
+                      <img
+                        src={`/api/invoices/${inv.id}/preview`}
+                        alt={`חשבונית - ${inv.vendor || inv.fileName}`}
+                        className="w-full"
+                        draggable={false}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -377,93 +386,6 @@ export default function PendingInvoicesPage() {
         })}
       </div>
 
-      {/* Fullscreen Lightbox */}
-      {lightboxId && (
-        <InvoiceLightbox
-          invoiceId={lightboxId}
-          vendor={invoices.find((i) => i.id === lightboxId)?.vendor || ""}
-          onClose={() => setLightboxId(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function InvoiceLightbox({
-  invoiceId,
-  vendor,
-  onClose,
-}: {
-  invoiceId: string;
-  vendor: string;
-  onClose: () => void;
-}) {
-  const [zoom, setZoom] = useState(1);
-
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "+" || e.key === "=") setZoom((z) => Math.min(z + 0.25, 4));
-      if (e.key === "-") setZoom((z) => Math.max(z - 0.25, 0.5));
-      if (e.key === "0") setZoom(1);
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", handleKey);
-    };
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-black/90">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black/60 text-white">
-        <span className="text-sm font-medium">{vendor || "חשבונית"}</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setZoom((z) => Math.max(z - 0.25, 0.5))}
-            className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
-          >
-            −
-          </button>
-          <span className="text-sm min-w-[4rem] text-center">{Math.round(zoom * 100)}%</span>
-          <button
-            onClick={() => setZoom((z) => Math.min(z + 0.25, 4))}
-            className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
-          >
-            +
-          </button>
-          <button
-            onClick={() => setZoom(1)}
-            className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
-          >
-            איפוס
-          </button>
-          <div className="w-px h-5 bg-white/20 mx-1" />
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Image area - scrollable & zoomable */}
-      <div className="flex-1 overflow-auto flex items-start justify-center p-4">
-        <img
-          src={`/api/invoices/${invoiceId}/preview`}
-          alt={`חשבונית - ${vendor}`}
-          className="shadow-2xl rounded-lg transition-transform duration-150"
-          style={{
-            transform: `scale(${zoom})`,
-            transformOrigin: "top center",
-            maxWidth: "100%",
-          }}
-          draggable={false}
-        />
-      </div>
     </div>
   );
 }
