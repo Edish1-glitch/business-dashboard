@@ -48,7 +48,6 @@ export default function UploadPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const validFiles = Array.from(newFiles).filter((f) => {
@@ -117,89 +116,47 @@ export default function UploadPage() {
         </p>
       </div>
 
-      {/* Upload options */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Documents / PDF */}
-        <label
-          className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
-          style={{ touchAction: "manipulation" }}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf"
-            multiple
-            onChange={(e) => e.target.files && addFiles(e.target.files)}
-            className="sr-only"
-          />
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-blue-100">
-            <FileText className="h-6 w-6 text-blue-600" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-medium">מסמך PDF</p>
-            <p className="text-xs text-muted-foreground">קובץ עם חשבוניות</p>
-          </div>
-        </label>
-
-        {/* Gallery / Images */}
-        <label
-          className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
-          style={{ touchAction: "manipulation" }}
-        >
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => e.target.files && addFiles(e.target.files)}
-            className="sr-only"
-          />
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-100">
-            <ImageIcon className="h-6 w-6 text-emerald-600" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-medium">גלריה</p>
-            <p className="text-xs text-muted-foreground">תמונות חשבוניות</p>
-          </div>
-        </label>
-
-        {/* Camera */}
-        <label
-          className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
-          style={{ touchAction: "manipulation" }}
-        >
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => e.target.files && addFiles(e.target.files)}
-            className="sr-only"
-          />
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-violet-100">
-            <Camera className="h-6 w-6 text-violet-600" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-medium">צילום</p>
-            <p className="text-xs text-muted-foreground">צלם חשבונית עכשיו</p>
-          </div>
-        </label>
-      </div>
-
-      {/* Drag & drop area */}
-      <div
+      {/* Single upload area */}
+      <label
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
+        className={`flex flex-col items-center justify-center gap-4 p-10 md:p-16 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
           isDragging
             ? "border-primary bg-primary/5 scale-[1.01]"
-            : "border-border/50 hover:border-border"
-        }`}
+            : "border-border hover:border-primary/50 hover:bg-muted/30"
+        } ${isProcessing ? "pointer-events-none opacity-60" : ""}`}
+        style={{ touchAction: "manipulation" }}
       >
-        <Upload className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">או גרור קבצים לכאן</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">PDF, JPG, PNG, WebP</p>
-      </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,image/*"
+          multiple
+          onChange={(e) => e.target.files && addFiles(e.target.files)}
+          className="sr-only"
+        />
+        <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10">
+          <Upload className="h-8 w-8 text-primary" />
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-semibold">בחר קבצים להעלאה</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            PDF, תמונה מהגלריה, או צילום מהמצלמה
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1 bg-muted/50 px-3 py-1.5 rounded-full">
+            <FileText className="h-3.5 w-3.5" /> PDF
+          </span>
+          <span className="flex items-center gap-1 bg-muted/50 px-3 py-1.5 rounded-full">
+            <ImageIcon className="h-3.5 w-3.5" /> JPG / PNG
+          </span>
+          <span className="flex items-center gap-1 bg-muted/50 px-3 py-1.5 rounded-full">
+            <Camera className="h-3.5 w-3.5" /> צילום
+          </span>
+        </div>
+      </label>
 
       {/* Selected files list */}
       {selectedFiles.length > 0 && (
