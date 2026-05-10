@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses    Expense[]
+  invoices    Invoice[]
+  creditCards CreditCard[]
+  emailAccounts EmailAccount[]
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  icon     String?
+  color    String?
+  expenses Expense[]
+  invoices Invoice[]
+}
+
+model CreditCard {
+  id       String    @id @default(cuid())
+  name     String
+  lastFour String
+  userId   String
+  user     User      @relation(fields: [userId], references: [id])
+  expenses Expense[]
+
+  @@index([userId])
+}
+
+model Expense {
+  id           String      @id @default(cuid())
+  amount       Float
+  description  String
+  date         DateTime
+  source       String      // "email", "pdf", "manual", "green-invoice"
+  paymentMethod String?    // "credit-card", "paypal", "cash", "transfer"
+  categoryId   String?
+  category     Category?   @relation(fields: [categoryId], references: [id])
+  creditCardId String?
+  creditCard   CreditCard? @relation(fields: [creditCardId], references: [id])
+  invoiceId    String?
+  invoice      Invoice?    @relation(fields: [invoiceId], references: [id])
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([date])
+}
+
+model Invoice {
+  id          String    @id @default(cuid())
+  fileName    String
+  filePath    String
+  fileUrl     String?
+  vendor      String?
+  amount      Float?
+  date        DateTime?
+  source      String    // "email", "pdf-upload", "green-invoice"
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  expenses    Expense[]
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([source])
+}
+
+model EmailAccount {
+  id           String   @id @default(cuid())
+  email        String
+  provider     String   @default("gmail")
+  accessToken  String?
+  refreshToken String?
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  lastSyncAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@unique([email, userId])
+  @@index([userId])
+}

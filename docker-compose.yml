@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: findash-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: findash
+      POSTGRES_PASSWORD: findash_dev_password
+      POSTGRES_DB: findash
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
