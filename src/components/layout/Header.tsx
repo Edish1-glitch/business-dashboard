@@ -1,9 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -35,18 +35,20 @@ const pageTitles: Record<string, string> = {
 export function Header() {
   const pathname = usePathname();
   const title = pageTitles[pathname] || "FinDash";
+  const [open, setOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 flex items-center h-16 px-4 md:px-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       {/* Mobile menu */}
-      <Sheet>
-        <SheetPrimitive.Trigger
-          render={
-            <Button variant="ghost" size="icon" className="md:hidden ml-2" />
-          }
-        >
-          <Menu className="h-5 w-5" />
-        </SheetPrimitive.Trigger>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="md:hidden ml-2 min-h-[44px] min-w-[44px]"
+        onClick={() => setOpen(true)}
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-64 p-0">
           <SheetTitle className="sr-only">תפריט ניווט</SheetTitle>
           <div className="flex items-center h-16 px-6 border-b border-border">
@@ -63,8 +65,9 @@ export function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
                     isActive
                       ? "bg-accent text-accent-foreground"
                       : "text-foreground/70 hover:bg-accent/50 hover:text-foreground"
