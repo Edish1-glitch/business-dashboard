@@ -7,13 +7,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const categoryId = searchParams.get("categoryId");
   const creditCardLast4 = searchParams.get("creditCardLast4");
+  const status = searchParams.get("status");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
   const where: Record<string, unknown> = {
     userId: TEMP_USER_ID,
-    source: "pdf-upload",
   };
+
+  if (status) where.status = status;
 
   if (categoryId) where.categoryId = categoryId;
   if (from || to) {

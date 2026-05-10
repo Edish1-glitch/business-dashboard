@@ -10,22 +10,24 @@ import {
   FileScan,
   Receipt,
   Settings,
-  ChevronRight,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "דאשבורד", href: "/", icon: LayoutDashboard },
-  { label: "חשבוניות מייל", href: "/invoices", icon: FileText },
   { label: "פיצול PDF", href: "/pdf-split", icon: FileScan },
+  { label: "ממתינות לאישור", href: "/invoices/pending", icon: ClipboardCheck },
+  { label: "חשבוניות", href: "/invoices", icon: FileText },
   { label: "חשבונית ירוקה", href: "/green-invoice", icon: Receipt },
   { label: "הגדרות", href: "/settings", icon: Settings },
 ];
 
 const pageTitles: Record<string, string> = {
   "/": "דאשבורד",
-  "/invoices": "חשבוניות מייל",
   "/pdf-split": "פיצול PDF",
+  "/invoices/pending": "ממתינות לאישור",
+  "/invoices": "חשבוניות",
   "/green-invoice": "חשבונית ירוקה",
   "/settings": "הגדרות",
 };

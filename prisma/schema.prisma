@@ -63,23 +63,26 @@ model Expense {
 }
 
 model Invoice {
-  id          String    @id @default(cuid())
-  fileName    String
-  filePath    String
-  fileUrl     String?
-  vendor      String?
-  amount      Float?
-  date        DateTime?
-  source      String    // "email", "pdf-upload", "green-invoice"
-  categoryId  String?
-  category    Category? @relation(fields: [categoryId], references: [id])
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  expenses    Expense[]
-  createdAt   DateTime  @default(now())
+  id              String    @id @default(cuid())
+  fileName        String
+  filePath        String
+  fileUrl         String?
+  vendor          String?
+  amount          Float?
+  date            DateTime?
+  source          String    // "email", "pdf-upload", "green-invoice"
+  status          String    @default("pending") // "pending", "approved", "rejected"
+  creditCardLast4 String?
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id])
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  expenses        Expense[]
+  createdAt       DateTime  @default(now())
 
   @@index([userId])
   @@index([source])
+  @@index([status])
 }
 
 model EmailAccount {

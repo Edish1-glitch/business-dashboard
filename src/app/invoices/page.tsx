@@ -55,6 +55,7 @@ export default function InvoicesPage() {
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
+    params.set("status", "approved");
     if (filterCard) params.set("creditCardLast4", filterCard);
 
     const res = await fetch(`/api/invoices?${params.toString()}`);

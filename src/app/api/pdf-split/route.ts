@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         categoryId = category?.id || null;
       }
 
-      // Save invoice to DB
+      // Save invoice to DB with "pending" status (not approved yet)
       const invoice = await prisma.invoice.create({
         data: {
           fileName,
@@ -101,6 +101,8 @@ export async function POST(request: NextRequest) {
           amount: invoiceData.amount,
           date: invoiceData.date,
           source: "pdf-upload",
+          status: "pending",
+          creditCardLast4: invoiceData.creditCardLast4,
           categoryId,
           userId: user.id,
         },
@@ -108,23 +110,7 @@ export async function POST(request: NextRequest) {
           category: true,
         },
       });
-
-      // Create expense record if we have an amount
-      if (invoiceData.amount) {
-        await prisma.expense.create({
-          data: {
-            amount: invoiceData.amount,
-            description: invoiceData.vendor || `חשבונית ${i + 1}`,
-            date: invoiceData.date || new Date(),
-            source: "pdf",
-            paymentMethod: invoiceData.creditCardLast4 ? "credit-card" : null,
-            categoryId,
-            creditCardId,
-            invoiceId: invoice.id,
-            userId: user.id,
-          },
-        });
-      }
+      // NOTE: Expense is NOT created here - only after user approves the invoice
 
       results.push({
         id: invoice.id,

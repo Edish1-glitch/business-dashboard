@@ -8,6 +8,7 @@ import {
   FileScan,
   Receipt,
   Settings,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,14 +19,19 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    label: "חשבוניות מייל",
-    href: "/invoices",
-    icon: FileText,
-  },
-  {
     label: "פיצול PDF",
     href: "/pdf-split",
     icon: FileScan,
+  },
+  {
+    label: "ממתינות לאישור",
+    href: "/invoices/pending",
+    icon: ClipboardCheck,
+  },
+  {
+    label: "חשבוניות",
+    href: "/invoices",
+    icon: FileText,
   },
   {
     label: "חשבונית ירוקה",
