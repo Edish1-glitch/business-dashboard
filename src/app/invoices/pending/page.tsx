@@ -13,6 +13,7 @@ import {
   Pencil,
   X,
   Plus,
+  Eye,
   FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ export default function PendingInvoicesPage() {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [approving, setApproving] = useState<string | null>(null);
   const [approvingAll, setApprovingAll] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -193,8 +195,17 @@ export default function PendingInvoicesPage() {
               className="rounded-2xl bg-card border border-amber-200 p-4 shadow-sm"
             >
               {isEditing ? (
-                /* Edit mode */
+                /* Edit mode with PDF preview */
                 <div className="space-y-3">
+                  {/* PDF Preview */}
+                  <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
+                    <img
+                      src={`/api/invoices/${inv.id}/preview`}
+                      alt={`חשבונית - ${inv.vendor || inv.fileName}`}
+                      className="w-full max-h-[500px] object-contain"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-medium text-muted-foreground mb-1 block">ספק</label>
@@ -287,52 +298,61 @@ export default function PendingInvoicesPage() {
                 </div>
               ) : (
                 /* View mode */
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold">
-                        {inv.vendor || inv.fileName}
-                      </span>
-                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                        ממתין
-                      </span>
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-semibold">
+                          {inv.vendor || inv.fileName}
+                        </span>
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                          ממתין
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                        {inv.amount !== null && (
+                          <span className="font-bold text-lg">
+                            ₪{inv.amount.toLocaleString("he-IL")}
+                          </span>
+                        )}
+                        {inv.date && (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {new Date(inv.date).toLocaleDateString("he-IL")}
+                          </span>
+                        )}
+                        {inv.category && (
+                          <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
+                            <Tag className="h-3 w-3" />
+                            {inv.category.name}
+                          </span>
+                        )}
+                        {inv.creditCardLast4 && (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <CreditCard className="h-3.5 w-3.5" />
+                            ****{inv.creditCardLast4}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
-                      {inv.amount !== null && (
-                        <span className="font-bold text-lg">
-                          ₪{inv.amount.toLocaleString("he-IL")}
-                        </span>
-                      )}
-                      {inv.date && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {new Date(inv.date).toLocaleDateString("he-IL")}
-                        </span>
-                      )}
-                      {inv.category && (
-                        <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
-                          <Tag className="h-3 w-3" />
-                          {inv.category.name}
-                        </span>
-                      )}
-                      {inv.creditCardLast4 && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <CreditCard className="h-3.5 w-3.5" />
-                          ****{inv.creditCardLast4}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => startEdit(inv)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setPreviewId(previewId === inv.id ? null : inv.id)}
+                        title="תצוגה מקדימה"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => startEdit(inv)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                     <Button
                       size="icon"
                       className="bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -346,6 +366,18 @@ export default function PendingInvoicesPage() {
                       )}
                     </Button>
                   </div>
+                  </div>
+
+                  {/* Quick Look PDF Preview */}
+                  {previewId === inv.id && (
+                    <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
+                      <img
+                        src={`/api/invoices/${inv.id}/preview`}
+                        alt={`חשבונית - ${inv.vendor || inv.fileName}`}
+                        className="w-full max-h-[450px] object-contain"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
