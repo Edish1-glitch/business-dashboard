@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Rubik, Geist_Mono } from "next/font/google";
+import { Heebo, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 
-const rubik = Rubik({
-  variable: "--font-rubik",
+const heebo = Heebo({
+  variable: "--font-heebo",
   subsets: ["latin", "hebrew"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 const geistMono = Geist_Mono({
@@ -29,7 +29,7 @@ export default function RootLayout({
     <html
       lang="he"
       dir="rtl"
-      className={`${rubik.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${heebo.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground" suppressHydrationWarning>
         <Sidebar />
