@@ -120,14 +120,14 @@ test.describe("Mobile (390x844)", () => {
     await page.goto("/");
     await page.locator("header button").first().click();
 
-    const sheet = page.locator('[data-slot="sheet-content"]');
-    await expect(sheet).toBeVisible();
+    const dialog = page.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible();
 
-    await expect(sheet.getByText("דאשבורד")).toBeVisible();
-    await expect(sheet.getByText("חשבוניות מייל")).toBeVisible();
-    await expect(sheet.getByText("פיצול PDF")).toBeVisible();
-    await expect(sheet.getByText("חשבונית ירוקה")).toBeVisible();
-    await expect(sheet.getByText("הגדרות")).toBeVisible();
+    await expect(dialog.getByText("דאשבורד")).toBeVisible();
+    await expect(dialog.getByText("חשבוניות מייל")).toBeVisible();
+    await expect(dialog.getByText("פיצול PDF")).toBeVisible();
+    await expect(dialog.getByText("חשבונית ירוקה")).toBeVisible();
+    await expect(dialog.getByText("הגדרות")).toBeVisible();
   });
 
   test("summary cards stack vertically", async ({ page }) => {
