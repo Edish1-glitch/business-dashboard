@@ -15,10 +15,10 @@ import {
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { label: "דאשבורד", href: "/", icon: LayoutDashboard },
+  { label: "דאשבורד", href: "/", icon: LayoutDashboard, exact: true },
   { label: "פיצול PDF", href: "/pdf-split", icon: FileScan },
   { label: "ממתינות לאישור", href: "/invoices/pending", icon: ClipboardCheck },
-  { label: "חשבוניות", href: "/invoices", icon: FileText },
+  { label: "חשבוניות", href: "/invoices", icon: FileText, exact: true },
   { label: "חשבונית ירוקה", href: "/green-invoice", icon: Receipt },
   { label: "הגדרות", href: "/settings", icon: Settings },
 ];
@@ -119,9 +119,9 @@ export function Header() {
 
         <div className="flex-1 px-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(item.href + "/");
 
             return (
               <Link

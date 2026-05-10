@@ -17,6 +17,7 @@ const navItems = [
     label: "דאשבורד",
     href: "/",
     icon: LayoutDashboard,
+    exact: true,
   },
   {
     label: "פיצול PDF",
@@ -32,6 +33,7 @@ const navItems = [
     label: "חשבוניות",
     href: "/invoices",
     icon: FileText,
+    exact: true,
   },
   {
     label: "חשבונית ירוקה",
@@ -70,9 +72,9 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 space-y-0.5">
         {navItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href));
+          const isActive = item.exact
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + "/");
 
           return (
             <Link

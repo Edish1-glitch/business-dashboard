@@ -144,10 +144,16 @@ export default function PendingInvoicesPage() {
 
   if (invoices.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground max-w-md mx-auto text-center">
         <CheckCircle2 className="h-12 w-12 mb-4 text-emerald-400" />
-        <p className="text-lg font-medium">אין חשבוניות ממתינות לאישור</p>
-        <p className="text-sm mt-1">כל החשבוניות אושרו</p>
+        <p className="text-lg font-medium">אין כרגע חשבוניות לאישור</p>
+        <p className="text-sm mt-2">
+          ניתן להעלות חשבונית חדשה בעמוד{" "}
+          <a href="/pdf-split" className="text-primary font-medium hover:underline">
+            פיצול PDF
+          </a>
+          , לאחר העלאה החשבוניות יופיעו כאן לבדיקה ואישור.
+        </p>
       </div>
     );
   }
