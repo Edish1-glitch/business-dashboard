@@ -64,15 +64,21 @@ export default function PendingInvoicesPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [invRes, catRes] = await Promise.all([
-      fetch("/api/invoices?status=pending"),
-      fetch("/api/categories"),
-    ]);
-    const invData = await invRes.json();
-    const catData = await catRes.json();
-    setInvoices(invData.invoices || []);
-    setCategories(catData.categories || []);
-    setLoading(false);
+    try {
+      const [invRes, catRes] = await Promise.all([
+        fetch("/api/invoices?status=pending"),
+        fetch("/api/categories"),
+      ]);
+      const invData = await invRes.json();
+      const catData = await catRes.json();
+      setInvoices(invData.invoices || []);
+      setCategories(catData.categories || []);
+    } catch (err) {
+      console.error("Failed to fetch:", err);
+      setInvoices([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
