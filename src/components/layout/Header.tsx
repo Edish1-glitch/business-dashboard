@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "דאשבורד", href: "/", icon: LayoutDashboard, exact: true },
-  { label: "פיצול PDF", href: "/pdf-split", icon: FileScan },
+  { label: "העלאת חשבוניות", href: "/upload", icon: FileScan },
   { label: "ממתינות לאישור", href: "/invoices/pending", icon: ClipboardCheck },
   { label: "חשבוניות", href: "/invoices", icon: FileText, exact: true },
   { label: "חשבונית ירוקה", href: "/green-invoice", icon: Receipt },
@@ -25,7 +25,7 @@ const navItems = [
 
 const pageTitles: Record<string, string> = {
   "/": "דאשבורד",
-  "/pdf-split": "פיצול PDF",
+  "/upload": "העלאת חשבוניות",
   "/invoices/pending": "ממתינות לאישור",
   "/invoices": "חשבוניות",
   "/green-invoice": "חשבונית ירוקה",

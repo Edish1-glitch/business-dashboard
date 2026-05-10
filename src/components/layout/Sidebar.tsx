@@ -20,8 +20,8 @@ const navItems = [
     exact: true,
   },
   {
-    label: "פיצול PDF",
-    href: "/pdf-split",
+    label: "העלאת חשבוניות",
+    href: "/upload",
     icon: FileScan,
   },
   {
