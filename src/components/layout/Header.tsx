@@ -64,11 +64,11 @@ export function Header() {
         className="peer sr-only"
       />
 
-      <header className="sticky top-0 z-40 flex items-center h-16 px-4 md:px-6 bg-background border-b border-border">
+      <header className="sticky top-0 z-40 flex items-center h-16 px-4 md:px-6 bg-background/80 backdrop-blur-xl border-b border-border/50">
         {/* <label> for native touch handling - Safari always responds to label taps */}
         <label
           htmlFor={checkboxId}
-          className="md:hidden ml-2 flex items-center justify-center w-11 h-11 rounded-lg active:bg-accent/80"
+          className="md:hidden ml-3 flex items-center justify-center w-11 h-11 rounded-xl hover:bg-accent active:bg-accent/80"
           style={{ cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
           aria-label="פתח תפריט"
           role="button"
@@ -76,7 +76,7 @@ export function Header() {
           <Menu className="h-5 w-5 pointer-events-none" />
         </label>
 
-        <h1 className="text-lg font-semibold">{title}</h1>
+        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
       </header>
 
       {/* Backdrop - direct sibling of checkbox so peer-checked works */}
@@ -88,26 +88,34 @@ export function Header() {
 
       {/* Sidebar - direct sibling of checkbox so peer-checked works */}
       <nav
-        className="fixed inset-y-0 right-0 z-50 w-64 bg-background shadow-xl flex flex-col translate-x-full peer-checked:translate-x-0 transition-transform duration-200 md:hidden"
+        className="fixed inset-y-0 right-0 z-50 w-72 bg-sidebar shadow-2xl flex flex-col translate-x-full peer-checked:translate-x-0 transition-transform duration-200 md:hidden"
         role="dialog"
       >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-border">
-          <div className="flex items-center">
-            <Receipt className="h-8 w-8 text-primary ml-2" />
-            <span className="text-xl font-bold">FinDash</span>
+        <div className="flex items-center justify-between h-16 px-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-sidebar-primary/20">
+              <Receipt className="h-5 w-5 text-sidebar-primary pointer-events-none" />
+            </div>
+            <span className="text-xl font-bold text-sidebar-foreground">FinDash</span>
           </div>
           <label
             htmlFor={checkboxId}
-            className="flex items-center justify-center w-11 h-11 rounded-lg active:bg-accent/80"
+            className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-sidebar-accent"
             style={{ cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
             aria-label="סגור תפריט"
             role="button"
           >
-            <X className="h-5 w-5 pointer-events-none" />
+            <X className="h-5 w-5 text-sidebar-foreground/60 pointer-events-none" />
           </label>
         </div>
 
-        <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <div className="px-5 pt-4 pb-2">
+          <p className="text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+            ניווט ראשי
+          </p>
+        </div>
+
+        <div className="flex-1 px-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -123,17 +131,14 @@ export function Header() {
                   document.body.style.overflow = "";
                 }}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
+                  "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-150 min-h-[44px]",
                   isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground/70 hover:bg-accent/50 hover:text-foreground"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md shadow-sidebar-primary/25"
+                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )}
               >
-                <item.icon className="h-5 w-5 shrink-0 pointer-events-none" />
+                <item.icon className="h-[18px] w-[18px] shrink-0 pointer-events-none" />
                 <span>{item.label}</span>
-                {isActive && (
-                  <ChevronRight className="h-4 w-4 mr-auto rotate-180 pointer-events-none" />
-                )}
               </Link>
             );
           })}

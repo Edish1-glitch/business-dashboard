@@ -4,36 +4,43 @@ import {
   FileText,
   CreditCard,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const cards = [
   {
-    title: "סה\"כ הוצאות החודש",
+    title: 'סה"כ הוצאות החודש',
     value: "₪0",
     description: "לא נטענו נתונים עדיין",
     icon: TrendingDown,
-    iconColor: "text-red-500",
+    gradient: "from-red-500 to-rose-600",
+    bgLight: "bg-red-50",
+    textColor: "text-red-600",
   },
   {
-    title: "סה\"כ הכנסות החודש",
+    title: 'סה"כ הכנסות החודש',
     value: "₪0",
     description: "לא נטענו נתונים עדיין",
     icon: TrendingUp,
-    iconColor: "text-green-500",
+    gradient: "from-emerald-500 to-green-600",
+    bgLight: "bg-emerald-50",
+    textColor: "text-emerald-600",
   },
   {
     title: "חשבוניות שנמשכו",
     value: "0",
     description: "חבר מיילים כדי להתחיל",
     icon: FileText,
-    iconColor: "text-blue-500",
+    gradient: "from-blue-500 to-indigo-600",
+    bgLight: "bg-blue-50",
+    textColor: "text-blue-600",
   },
   {
     title: "כרטיסי אשראי",
     value: "0",
     description: "הוסף כרטיסים בהגדרות",
     icon: CreditCard,
-    iconColor: "text-purple-500",
+    gradient: "from-violet-500 to-purple-600",
+    bgLight: "bg-violet-50",
+    textColor: "text-violet-600",
   },
 ];
 
@@ -41,20 +48,30 @@ export function SummaryCards() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
-        <Card key={card.title}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <div
+          key={card.title}
+          data-slot="card"
+          className="relative overflow-hidden rounded-2xl bg-card border border-border/50 p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
+        >
+          {/* Gradient accent bar */}
+          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-l ${card.gradient}`} />
+
+          <div className="flex items-start justify-between">
+            <p className="text-sm font-medium text-muted-foreground">
               {card.title}
-            </CardTitle>
-            <card.icon className={`h-5 w-5 ${card.iconColor}`} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{card.value}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            </p>
+            <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${card.bgLight}`}>
+              <card.icon className={`h-5 w-5 ${card.textColor}`} />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <p className="text-3xl font-bold tracking-tight">{card.value}</p>
+            <p className="text-xs text-muted-foreground mt-1.5">
               {card.description}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ))}
     </div>
   );
