@@ -69,8 +69,8 @@ test.describe("Desktop (1440x900)", () => {
 
   test("hamburger menu is hidden", async ({ page }) => {
     await page.goto("/");
-    const menuButton = page.locator('header button[aria-label="פתח תפריט"]');
-    await expect(menuButton).toBeHidden();
+    const menuLabel = page.locator('header label[aria-label="פתח תפריט"]');
+    await expect(menuLabel).toBeHidden();
   });
 
   test("summary cards are in a wide grid", async ({ page }) => {
@@ -103,13 +103,13 @@ test.describe("Mobile (390x844)", () => {
 
   test("hamburger menu is visible", async ({ page }) => {
     await page.goto("/");
-    const menuButton = page.locator("header button").first();
-    await expect(menuButton).toBeVisible();
+    const menuLabel = page.locator('header label[aria-label="פתח תפריט"]');
+    await expect(menuLabel).toBeVisible();
   });
 
   test("mobile menu opens and shows navigation", async ({ page }) => {
     await page.goto("/");
-    await page.locator("header button").first().click();
+    await page.locator('header label[aria-label="פתח תפריט"]').click();
 
     const dialog = page.locator('[role="dialog"]');
     await expect(dialog).toBeVisible();
