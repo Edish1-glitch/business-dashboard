@@ -13,8 +13,6 @@ import {
   Pencil,
   X,
   Plus,
-  Eye,
-  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -60,7 +58,6 @@ export default function PendingInvoicesPage() {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [approving, setApproving] = useState<string | null>(null);
   const [approvingAll, setApprovingAll] = useState(false);
-  const [previewId, setPreviewId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -157,8 +154,8 @@ export default function PendingInvoicesPage() {
         <p className="text-lg font-medium">אין כרגע חשבוניות לאישור</p>
         <p className="text-sm mt-2">
           ניתן להעלות חשבונית חדשה בעמוד{" "}
-          <a href="/pdf-split" className="text-primary font-medium hover:underline">
-            פיצול PDF
+          <a href="/upload" className="text-primary font-medium hover:underline">
+            העלאת חשבוניות
           </a>
           , לאחר העלאה החשבוניות יופיעו כאן לבדיקה ואישור.
         </p>
@@ -167,7 +164,7 @@ export default function PendingInvoicesPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -201,164 +198,159 @@ export default function PendingInvoicesPage() {
               className="rounded-2xl bg-card border border-amber-200 p-4 shadow-sm"
             >
               {isEditing ? (
-                /* Edit mode with PDF preview */
-                <div className="space-y-3">
-                  {/* PDF Preview */}
-                  <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
+                /* Edit mode - side by side: image left, form right */
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* Preview image - left side */}
+                  <div className="md:w-1/2 rounded-xl border border-border overflow-auto bg-white max-h-[600px] shrink-0">
                     <img
                       src={`/api/invoices/${inv.id}/preview`}
                       alt={`חשבונית - ${inv.vendor || inv.fileName}`}
-                      className="w-full max-h-[500px] object-contain"
+                      className="w-full"
+                      draggable={false}
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">ספק</label>
-                      <input
-                        type="text"
-                        value={editData.vendor || ""}
-                        onChange={(e) => setEditData({ ...editData, vendor: e.target.value })}
-                        className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">סכום (₪)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editData.amount || ""}
-                        onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })}
-                        className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">תאריך</label>
-                      <input
-                        type="date"
-                        value={typeof editData.date === "string" ? editData.date : ""}
-                        onChange={(e) => setEditData({ ...editData, date: e.target.value })}
-                        className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">4 ספרות כרטיס</label>
-                      <input
-                        type="text"
-                        maxLength={4}
-                        value={editData.creditCardLast4 || ""}
-                        onChange={(e) => setEditData({ ...editData, creditCardLast4: e.target.value.replace(/\D/g, "") })}
-                        className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm"
-                        placeholder="1234"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">קטגוריה</label>
-                      <div className="flex gap-2">
-                        <select
-                          value={editData.category?.id || ""}
-                          onChange={(e) => {
-                            const cat = categories.find((c) => c.id === e.target.value);
-                            setEditData({ ...editData, category: cat || null });
-                          }}
-                          className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm"
-                        >
-                          <option value="">ללא קטגוריה</option>
-                          {categories.map((cat) => (
-                            <option key={cat.id} value={cat.id}>{cat.name}</option>
-                          ))}
-                        </select>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowNewCategory(!showNewCategory)}
-                          className="shrink-0"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                  {/* Form - right side */}
+                  <div className="md:w-1/2 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">ספק</label>
+                        <input
+                          type="text"
+                          value={editData.vendor || ""}
+                          onChange={(e) => setEditData({ ...editData, vendor: e.target.value })}
+                          className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm"
+                        />
                       </div>
-                      {showNewCategory && (
-                        <div className="flex gap-2 mt-2">
-                          <input
-                            type="text"
-                            value={newCategoryName}
-                            onChange={(e) => setNewCategoryName(e.target.value)}
-                            placeholder="שם קטגוריה חדשה"
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">סכום (₪)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editData.amount || ""}
+                          onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })}
+                          className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">תאריך</label>
+                        <input
+                          type="date"
+                          value={typeof editData.date === "string" ? editData.date : ""}
+                          onChange={(e) => setEditData({ ...editData, date: e.target.value })}
+                          className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">4 ספרות כרטיס</label>
+                        <input
+                          type="text"
+                          maxLength={4}
+                          value={editData.creditCardLast4 || ""}
+                          onChange={(e) => setEditData({ ...editData, creditCardLast4: e.target.value.replace(/\D/g, "") })}
+                          className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm"
+                          placeholder="1234"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">קטגוריה</label>
+                        <div className="flex gap-2">
+                          <select
+                            value={editData.category?.id || ""}
+                            onChange={(e) => {
+                              const cat = categories.find((c) => c.id === e.target.value);
+                              setEditData({ ...editData, category: cat || null });
+                            }}
                             className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm"
-                          />
-                          <Button size="sm" onClick={addCategory}>
-                            הוסף
+                          >
+                            <option value="">ללא קטגוריה</option>
+                            {categories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                          </select>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowNewCategory(!showNewCategory)}
+                            className="shrink-0"
+                          >
+                            <Plus className="h-4 w-4" />
                           </Button>
                         </div>
-                      )}
+                        {showNewCategory && (
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              type="text"
+                              value={newCategoryName}
+                              onChange={(e) => setNewCategoryName(e.target.value)}
+                              placeholder="שם קטגוריה חדשה"
+                              className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm"
+                            />
+                            <Button size="sm" onClick={addCategory}>
+                              הוסף
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
-                      <X className="h-4 w-4 ml-1" /> ביטול
-                    </Button>
-                    <Button size="sm" onClick={() => saveEdit(inv.id)}>
-                      שמור
-                    </Button>
+                    <div className="flex gap-2 justify-end pt-2">
+                      <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                        <X className="h-4 w-4 ml-1" /> ביטול
+                      </Button>
+                      <Button size="sm" onClick={() => saveEdit(inv.id)}>
+                        שמור
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ) : (
                 /* View mode */
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-semibold">
-                          {inv.vendor || inv.fileName}
-                        </span>
-                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                          ממתין
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
-                        {inv.amount !== null && (
-                          <span className="font-bold text-lg">
-                            ₪{inv.amount.toLocaleString("he-IL")}
-                          </span>
-                        )}
-                        {inv.date && (
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <Calendar className="h-3.5 w-3.5" />
-                            {new Date(inv.date).toLocaleDateString("he-IL")}
-                          </span>
-                        )}
-                        {inv.category && (
-                          <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
-                            <Tag className="h-3 w-3" />
-                            {inv.category.name}
-                          </span>
-                        )}
-                        {inv.creditCardLast4 && (
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <CreditCard className="h-3.5 w-3.5" />
-                            ****{inv.creditCardLast4}
-                          </span>
-                        )}
-                      </div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-semibold">
+                        {inv.vendor || inv.fileName}
+                      </span>
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                        ממתין
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setPreviewId(previewId === inv.id ? null : inv.id)}
-                        title="תצוגה מקדימה"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => startEdit(inv)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                      {inv.amount !== null && (
+                        <span className="font-bold text-lg">
+                          ₪{inv.amount.toLocaleString("he-IL")}
+                        </span>
+                      )}
+                      {inv.date && (
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {new Date(inv.date).toLocaleDateString("he-IL")}
+                        </span>
+                      )}
+                      {inv.category && (
+                        <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
+                          <Tag className="h-3 w-3" />
+                          {inv.category.name}
+                        </span>
+                      )}
+                      {inv.creditCardLast4 && (
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <CreditCard className="h-3.5 w-3.5" />
+                          ****{inv.creditCardLast4}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => startEdit(inv)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <Button
                       size="icon"
                       className="bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -372,26 +364,12 @@ export default function PendingInvoicesPage() {
                       )}
                     </Button>
                   </div>
-                  </div>
-
-                  {/* Inline Preview - scrollable with full-width image */}
-                  {previewId === inv.id && (
-                    <div className="rounded-xl border border-border overflow-auto bg-white max-h-[500px]">
-                      <img
-                        src={`/api/invoices/${inv.id}/preview`}
-                        alt={`חשבונית - ${inv.vendor || inv.fileName}`}
-                        className="w-full"
-                        draggable={false}
-                      />
-                    </div>
-                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
-
     </div>
   );
 }
