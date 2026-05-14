@@ -13,25 +13,31 @@ export async function GET(
   });
 
   if (!invoice) {
-    return NextResponse.json(
-      { error: "חשבונית לא נמצאה" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "חשבונית לא נמצאה" }, { status: 404 });
   }
 
+  // Try DB first (base64), then filesystem fallback
+  if (invoice.fileData) {
+    const buffer = Buffer.from(invoice.fileData, "base64");
+    const isImage = invoice.fileName.match(/\.(jpg|jpeg|png|webp)$/i);
+    return new NextResponse(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type": isImage ? "image/png" : "application/pdf",
+        "Content-Disposition": `attachment; filename="${invoice.fileName}"`,
+      },
+    });
+  }
+
+  // Fallback to filesystem
   try {
     const fileBuffer = await readFile(invoice.filePath);
-
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${invoice.fileName}"`,
       },
     });
   } catch {
-    return NextResponse.json(
-      { error: "הקובץ לא נמצא" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "הקובץ לא נמצא" }, { status: 404 });
   }
 }

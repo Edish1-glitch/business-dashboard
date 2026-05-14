@@ -21,20 +21,37 @@ export async function GET(
   }
 
   try {
-    const pdfBuffer = await readFile(invoice.filePath);
+    // Get file buffer from DB or filesystem
+    let fileBuffer: Buffer;
+    if (invoice.fileData) {
+      fileBuffer = Buffer.from(invoice.fileData, "base64");
+    } else {
+      fileBuffer = await readFile(invoice.filePath);
+    }
+
+    // If it's an image, return directly
+    const isImage = invoice.fileName.match(/\.(jpg|jpeg|png|webp)$/i);
+    if (isImage) {
+      return new NextResponse(new Uint8Array(fileBuffer), {
+        headers: {
+          "Content-Type": "image/png",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
 
     // Convert PDF to PNG using pdftoppm
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), "findash-preview-"));
     const pdfPath = path.join(tmpDir, "input.pdf");
     const imgPrefix = path.join(tmpDir, "page");
 
-    await writeFile(pdfPath, pdfBuffer);
+    await writeFile(pdfPath, fileBuffer);
     await execFileAsync("pdftoppm", ["-png", "-r", "200", "-singlefile", pdfPath, imgPrefix]);
 
     const imgBuffer = await readFile(path.join(tmpDir, "page.png"));
     await rm(tmpDir, { recursive: true, force: true });
 
-    return new NextResponse(imgBuffer, {
+    return new NextResponse(new Uint8Array(imgBuffer), {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "public, max-age=3600",

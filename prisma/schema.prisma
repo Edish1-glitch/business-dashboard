@@ -67,6 +67,7 @@ model Invoice {
   fileName        String
   filePath        String
   fileUrl         String?
+  fileData        String?   @db.Text // base64 encoded file content
   vendor          String?
   amount          Float?
   date            DateTime?

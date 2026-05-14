@@ -44,11 +44,12 @@ async function processPage(
     categoryId = category?.id || null;
   }
 
-  // Save invoice
+  // Save invoice with file data in DB
   const invoice = await prisma.invoice.create({
     data: {
       fileName,
       filePath,
+      fileData: buffer.toString("base64"),
       vendor: invoiceData.vendor,
       amount: invoiceData.amount,
       date: invoiceData.date,
