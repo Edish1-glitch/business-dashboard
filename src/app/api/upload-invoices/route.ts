@@ -4,24 +4,11 @@ import { extractTextFromPdf } from "@/lib/pdf/extract";
 import { ocrFromImage } from "@/lib/pdf/ocr-image";
 import { extractInvoiceData } from "@/lib/pdf/categorize";
 import { prisma } from "@/lib/db";
+import { getAuthUser } from "@/lib/api-auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
-const TEMP_USER_ID = "temp-user-1";
-
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic"];
-
-async function ensureUser() {
-  return prisma.user.upsert({
-    where: { email: "user@findash.local" },
-    update: {},
-    create: {
-      id: TEMP_USER_ID,
-      email: "user@findash.local",
-      name: "משתמש FinDash",
-    },
-  });
-}
 
 async function processPage(
   buffer: Buffer,
@@ -93,7 +80,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "יש להעלות לפחות קובץ אחד" }, { status: 400 });
     }
 
-    const user = await ensureUser();
+    const { user, error } = await getAuthUser();
+    if (error) return error;
     const uploadsDir = path.join(process.cwd(), "uploads", Date.now().toString());
     await mkdir(uploadsDir, { recursive: true });
 

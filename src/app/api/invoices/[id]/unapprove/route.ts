@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getAuthUser } from "@/lib/api-auth";
 
 // Revert invoice back to pending - deletes associated expense
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { user, error } = await getAuthUser();
+  if (error) return error;
+
   const { id } = await params;
 
-  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  const invoice = await prisma.invoice.findUnique({ where: { id, userId: user.id } });
   if (!invoice) {
     return NextResponse.json({ error: "חשבונית לא נמצאה" }, { status: 404 });
   }

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-
-const TEMP_USER_ID = "temp-user-1";
+import { getAuthUser } from "@/lib/api-auth";
 
 // Approve all pending invoices
 export async function POST() {
+  const { user, error } = await getAuthUser();
+  if (error) return error;
+
   const pendingInvoices = await prisma.invoice.findMany({
-    where: { userId: TEMP_USER_ID, status: "pending" },
+    where: { userId: user.id, status: "pending" },
   });
 
   let approved = 0;
@@ -16,7 +18,7 @@ export async function POST() {
     let creditCardId: string | null = null;
     if (invoice.creditCardLast4) {
       const card = await prisma.creditCard.findFirst({
-        where: { userId: TEMP_USER_ID, lastFour: invoice.creditCardLast4 },
+        where: { userId: user.id, lastFour: invoice.creditCardLast4 },
       });
       creditCardId = card?.id || null;
     }
@@ -39,7 +41,7 @@ export async function POST() {
           categoryId: invoice.categoryId,
           creditCardId,
           invoiceId: invoice.id,
-          userId: TEMP_USER_ID,
+          userId: user.id,
         },
       });
     }

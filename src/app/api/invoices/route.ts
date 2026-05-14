@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-
-const TEMP_USER_ID = "temp-user-1";
+import { getAuthUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   try {
+    const { user, error } = await getAuthUser();
+    if (error) return error;
+
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get("categoryId");
     const creditCardLast4 = searchParams.get("creditCardLast4");
@@ -13,7 +15,7 @@ export async function GET(request: NextRequest) {
     const to = searchParams.get("to");
 
     const where: Record<string, unknown> = {
-      userId: TEMP_USER_ID,
+      userId: user.id,
     };
 
     if (status) where.status = status;
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (creditCardLast4) {
       const expenses = await prisma.expense.findMany({
         where: {
-          userId: TEMP_USER_ID,
+          userId: user.id,
           creditCard: { lastFour: creditCardLast4 },
         },
         select: { invoiceId: true },
