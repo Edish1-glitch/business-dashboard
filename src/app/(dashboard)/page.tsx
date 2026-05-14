@@ -96,7 +96,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Welcome banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-indigo-600 via-violet-600 to-purple-700 p-6 md:p-8 text-white shadow-lg">
+      <div data-tour="welcome-banner" className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-indigo-600 via-violet-600 to-purple-700 p-6 md:p-8 text-white shadow-lg">
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="h-5 w-5 text-amber-300" />
@@ -112,7 +112,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Date filter */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div data-tour="date-filter" className="flex flex-wrap items-center gap-3">
         <Calendar className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm text-muted-foreground">סנן לפי תאריך:</span>
         <input
@@ -145,7 +145,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div data-tour="summary-cards" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {cards.map((card) => (
               <div
                 key={card.title}
@@ -167,7 +167,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Charts */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div data-tour="charts" className="grid gap-4 md:grid-cols-2">
             {/* Pie chart */}
             <div className="rounded-2xl bg-card border border-border/50 p-5 shadow-sm">
               <h3 className="text-base font-semibold mb-4">הוצאות לפי קטגוריה</h3>

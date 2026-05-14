@@ -1,7 +1,8 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { Receipt } from "lucide-react";
+import { Receipt, Eye } from "lucide-react";
+import Link from "next/link";
 
 export default function LoginPage() {
   return (
@@ -34,6 +35,15 @@ export default function LoginPage() {
           </svg>
           התחבר עם Google
         </button>
+
+        {/* Tour button */}
+        <Link
+          href="/tour"
+          className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition-colors text-sm font-medium"
+        >
+          <Eye className="h-5 w-5" />
+          סיור באפליקציה
+        </Link>
 
         <p className="text-xs text-muted-foreground">
           המידע שלך מוגן ומאובטח

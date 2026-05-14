@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Tag, User, Plus, Loader2, X } from "lucide-react";
+import { Tag, User, Plus, Loader2, X, Play } from "lucide-react";
+import { useTour } from "@/components/tour/TourProvider";
 import { Button } from "@/components/ui/button";
 
 interface Category {
@@ -13,6 +14,7 @@ interface Category {
 
 export default function SettingsPage() {
   const { data: session } = useSession();
+  const { startTour } = useTour();
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -51,7 +53,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
+    <div data-tour="settings" className="space-y-8 max-w-2xl mx-auto">
       <h2 className="text-xl font-bold">הגדרות</h2>
 
       {/* Profile */}
@@ -124,6 +126,20 @@ export default function SettingsPage() {
             </div>
           </>
         )}
+      </div>
+
+      {/* Tour */}
+      <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold">סיור באפליקציה</h3>
+            <p className="text-sm text-muted-foreground">מדריך אינטראקטיבי שמציג את כל הפיצ׳רים</p>
+          </div>
+          <Button onClick={startTour} className="gap-2">
+            <Play className="h-4 w-4" />
+            התחל סיור
+          </Button>
+        </div>
       </div>
 
       {/* App info */}

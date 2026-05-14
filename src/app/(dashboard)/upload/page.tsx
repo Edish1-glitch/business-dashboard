@@ -107,6 +107,7 @@ export default function UploadPage() {
       </div>
 
       {/* Single upload area */}
+      <div data-tour="upload-area">
       <label
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
@@ -147,6 +148,8 @@ export default function UploadPage() {
           </span>
         </div>
       </label>
+
+      </div>
 
       {/* Selected files list */}
       {selectedFiles.length > 0 && (
