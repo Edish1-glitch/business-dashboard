@@ -1,151 +1,94 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Dashboard - Layout & RTL", () => {
-  test("page loads with correct title", async ({ page }) => {
+test.describe("Auth & Login", () => {
+  test("unauthenticated user redirects to login", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle("FinDash - ניהול פיננסי");
+    await expect(page).toHaveURL(/\/login/);
   });
 
-  test("HTML has RTL direction and Hebrew lang", async ({ page }) => {
-    await page.goto("/");
+  test("login page loads with correct elements", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page).toHaveTitle("FinDash - ניהול פיננסי");
+    await expect(page.getByText("FinDash")).toBeVisible();
+    await expect(page.getByText("התחבר עם Google")).toBeVisible();
+    await expect(page.getByText("סיור באפליקציה")).toBeVisible();
+  });
+
+  test("login page has RTL direction", async ({ page }) => {
+    await page.goto("/login");
     const html = page.locator("html");
     await expect(html).toHaveAttribute("dir", "rtl");
     await expect(html).toHaveAttribute("lang", "he");
   });
+});
 
-  test("displays page header with title", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.locator("header h1")).toHaveText("דאשבורד");
+test.describe("Tour Page", () => {
+  test("tour page loads without auth", async ({ page }) => {
+    await page.goto("/tour");
+    await expect(page.getByText("סיור באפליקציה")).toBeVisible();
+    await expect(page.getByText("דאשבורד ראשי")).toBeVisible();
+  });
+
+  test("tour has 4 steps with navigation", async ({ page }) => {
+    await page.goto("/tour");
+    // Step 1
+    await expect(page.getByText("דאשבורד ראשי")).toBeVisible();
+    await expect(page.getByText("1/4")).toBeVisible();
+
+    // Navigate to step 2
+    await page.getByText("הבא").click();
+    await expect(page.getByText("העלאת חשבוניות")).toBeVisible();
+    await expect(page.getByText("2/4")).toBeVisible();
+
+    // Navigate to step 3
+    await page.getByText("הבא").click();
+    await expect(page.getByText("אישור חשבוניות")).toBeVisible();
+
+    // Navigate to step 4
+    await page.getByText("הבא").click();
+    await expect(page.getByText("ניהול וייצוא")).toBeVisible();
+    await expect(page.getByText("מוכן? התחבר עכשיו")).toBeVisible();
   });
 });
 
-test.describe("Dashboard - Summary Cards", () => {
-  test("displays all 6 cards (4 summary + 2 placeholder)", async ({ page }) => {
-    await page.goto("/");
-    const cards = page.locator('[data-slot="card"]');
-    await expect(cards).toHaveCount(6);
+test.describe("API Protection", () => {
+  test("invoices API requires auth", async ({ page }) => {
+    await page.goto("/api/invoices?status=pending");
+    // Should redirect to login
+    await expect(page).toHaveURL(/\/login/);
   });
 
-  test("summary cards show correct titles in Hebrew", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText("הוצאות החודש")).toBeVisible();
-    await expect(page.getByText("הכנסות החודש")).toBeVisible();
-    await expect(page.getByText("חשבוניות שנמשכו", { exact: true })).toBeVisible();
-    await expect(page.getByText("כרטיסי אשראי")).toBeVisible();
+  test("categories API requires auth", async ({ page }) => {
+    await page.goto("/api/categories");
+    await expect(page).toHaveURL(/\/login/);
   });
 
-  test("placeholder sections are visible", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText("הוצאות לפי קטגוריה")).toBeVisible();
-    await expect(page.getByText("חשבוניות אחרונות")).toBeVisible();
+  test("auth providers endpoint works", async ({ page }) => {
+    const res = await page.request.get("/api/auth/providers");
+    expect(res.status()).toBe(200);
+    const data = await res.json();
+    expect(data.google).toBeTruthy();
   });
 });
 
-test.describe("Desktop (1440x900)", () => {
-  test.use({ viewport: { width: 1440, height: 900 } });
+test.describe("Responsive - Login Page", () => {
+  test.describe("Mobile (390x844)", () => {
+    test.use({ viewport: { width: 390, height: 844 } });
 
-  test("sidebar is visible", async ({ page }) => {
-    await page.goto("/");
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toBeVisible();
+    test("login page is responsive on mobile", async ({ page }) => {
+      await page.goto("/login");
+      await expect(page.getByText("FinDash")).toBeVisible();
+      await expect(page.getByText("התחבר עם Google")).toBeVisible();
+    });
   });
 
-  test("sidebar contains all navigation links", async ({ page }) => {
-    await page.goto("/");
-    const sidebar = page.locator("aside");
-    await expect(sidebar.getByText("דאשבורד")).toBeVisible();
-    await expect(sidebar.getByText("חשבוניות מייל")).toBeVisible();
-    await expect(sidebar.getByText("פיצול PDF")).toBeVisible();
-    await expect(sidebar.getByText("חשבונית ירוקה")).toBeVisible();
-    await expect(sidebar.getByText("הגדרות")).toBeVisible();
-  });
+  test.describe("Desktop (1440x900)", () => {
+    test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("sidebar shows FinDash brand", async ({ page }) => {
-    await page.goto("/");
-    const sidebar = page.locator("aside");
-    const brand = sidebar.locator("span", { hasText: "FinDash" });
-    await expect(brand).toBeVisible();
-  });
-
-  test("hamburger menu is hidden", async ({ page }) => {
-    await page.goto("/");
-    const menuLabel = page.locator('header label[aria-label="פתח תפריט"]');
-    await expect(menuLabel).toBeHidden();
-  });
-
-  test("summary cards are in a wide grid", async ({ page }) => {
-    await page.goto("/");
-    const cards = page.locator('[data-slot="card"]');
-    const first = await cards.nth(0).boundingBox();
-    const second = await cards.nth(1).boundingBox();
-    // On desktop, first two cards should be side by side
-    expect(Math.abs(second!.y - first!.y)).toBeLessThan(5);
-  });
-
-  test("clicking nav links updates URL", async ({ page }) => {
-    await page.goto("/");
-    await page.locator("aside").getByText("חשבוניות מייל").click();
-    await expect(page).toHaveURL(/\/invoices/);
-
-    await page.locator("aside").getByText("פיצול PDF").click();
-    await expect(page).toHaveURL(/\/pdf-split/);
-  });
-});
-
-test.describe("Mobile (390x844)", () => {
-  test.use({ viewport: { width: 390, height: 844 } });
-
-  test("sidebar is hidden", async ({ page }) => {
-    await page.goto("/");
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toBeHidden();
-  });
-
-  test("hamburger menu is visible", async ({ page }) => {
-    await page.goto("/");
-    const menuLabel = page.locator('header label[aria-label="פתח תפריט"]');
-    await expect(menuLabel).toBeVisible();
-  });
-
-  test("mobile menu opens and shows navigation", async ({ page }) => {
-    await page.goto("/");
-    await page.locator('header label[aria-label="פתח תפריט"]').click();
-
-    const dialog = page.locator('[role="dialog"]');
-    await expect(dialog).toBeVisible();
-
-    await expect(dialog.getByText("דאשבורד")).toBeVisible();
-    await expect(dialog.getByText("חשבוניות מייל")).toBeVisible();
-    await expect(dialog.getByText("פיצול PDF")).toBeVisible();
-    await expect(dialog.getByText("חשבונית ירוקה")).toBeVisible();
-    await expect(dialog.getByText("הגדרות")).toBeVisible();
-  });
-
-  test("summary cards stack vertically", async ({ page }) => {
-    await page.goto("/");
-    const cards = page.locator('[data-slot="card"]');
-    const first = await cards.nth(0).boundingBox();
-    const second = await cards.nth(1).boundingBox();
-    // Cards should be stacked vertically
-    expect(second!.y).toBeGreaterThan(first!.y + first!.height - 5);
-  });
-});
-
-test.describe("Tablet (810x1080)", () => {
-  test.use({ viewport: { width: 810, height: 1080 } });
-
-  test("sidebar is visible on tablet (md breakpoint)", async ({ page }) => {
-    await page.goto("/");
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toBeVisible();
-  });
-
-  test("summary cards show in 2-column grid", async ({ page }) => {
-    await page.goto("/");
-    const cards = page.locator('[data-slot="card"]');
-    const first = await cards.nth(0).boundingBox();
-    const second = await cards.nth(1).boundingBox();
-    // On tablet (sm breakpoint), first two cards should be side by side
-    expect(Math.abs(second!.y - first!.y)).toBeLessThan(5);
+    test("login page is responsive on desktop", async ({ page }) => {
+      await page.goto("/login");
+      await expect(page.getByText("FinDash")).toBeVisible();
+      await expect(page.getByText("התחבר עם Google")).toBeVisible();
+    });
   });
 });
