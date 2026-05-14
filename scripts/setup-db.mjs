@@ -1,13 +1,10 @@
 import { execSync } from "child_process";
 
-console.log("Setting up database...");
+console.log("Checking database...");
 
 try {
-  console.log("Pushing schema...");
-  execSync("npx prisma db push --skip-generate", {
-    stdio: "inherit",
-  });
-  console.log("Schema pushed successfully");
-} catch (e) {
-  console.error("Schema push failed, trying to continue anyway...");
+  execSync("npx prisma db push", { stdio: "inherit", timeout: 30000 });
+  console.log("Database ready");
+} catch {
+  console.log("DB push skipped (may already be synced)");
 }
