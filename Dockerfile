@@ -36,9 +36,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy prisma schema and generated client
+# Copy prisma schema, config, and generated client
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src/generated ./src/generated
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/package.json ./package.json
 
 # Copy production node_modules (has all pg deps)
 COPY --from=deps /app/node_modules ./node_modules
@@ -47,4 +50,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+# Push schema to DB then start server
+CMD ["sh", "-c", "node scripts/setup-db.mjs && node server.js"]
