@@ -17,6 +17,7 @@ import {
   Eye,
   AlertTriangle,
   X,
+  FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -45,6 +46,7 @@ export default function InvoicesPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [filterCard, setFilterCard] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -84,9 +86,17 @@ export default function InvoicesPage() {
     fetchInvoices();
   };
 
-  const filtered = filterCategory
+  let filtered = filterCategory
     ? invoices.filter((inv) => inv.category?.name === filterCategory)
     : invoices;
+
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter((inv) =>
+      (inv.vendor || "").toLowerCase().includes(q) ||
+      (inv.amount?.toString() || "").includes(q)
+    );
+  }
 
   const totalAmount = filtered.reduce((sum, inv) => sum + (inv.amount || 0), 0);
 
@@ -100,15 +110,26 @@ export default function InvoicesPage() {
             {filtered.length} חשבוניות | סה&quot;כ ₪{totalAmount.toLocaleString("he-IL")}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-          className="gap-2"
-        >
-          <Filter className="h-4 w-4" />
-          סינון
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open("/api/invoices/export?format=csv", "_blank")}
+            className="gap-2"
+          >
+            <FileDown className="h-4 w-4" />
+            CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
+          >
+            <Filter className="h-4 w-4" />
+            סינון
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -150,6 +171,18 @@ export default function InvoicesPage() {
           )}
         </div>
       )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="חיפוש לפי שם ספק או סכום..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full h-10 rounded-xl border border-input bg-background pr-10 pl-3 text-sm"
+        />
+      </div>
 
       {/* Loading */}
       {loading && (
