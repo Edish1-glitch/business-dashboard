@@ -5,6 +5,8 @@ import { Menu, X, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useTheme } from "@/components/providers/ThemeProvider";
+import { Sun, Moon } from "lucide-react";
 import {
   LayoutDashboard,
   FileText,
@@ -38,6 +40,7 @@ export function Header() {
   const title = pageTitles[pathname] || "FinDash";
   const checkboxId = useId();
   const { data: session } = useSession();
+  const { theme, toggleTheme } = useTheme();
 
   // Close menu on route change
   useEffect(() => {
@@ -99,6 +102,13 @@ export function Header() {
                   {session.user.name?.split(" ")[0]}
                 </span>
               </div>
+              <button
+                onClick={toggleTheme}
+                className="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title={theme === "light" ? "מצב כהה" : "מצב בהיר"}
+              >
+                {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </button>
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
