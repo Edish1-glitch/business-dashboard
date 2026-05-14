@@ -43,8 +43,10 @@ COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/package.json ./package.json
 
-# Copy production node_modules (has all pg deps)
+# Copy production node_modules + prisma CLI from builder
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
 
 EXPOSE 3000
 ENV PORT=3000
