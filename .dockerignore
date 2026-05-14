@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+uploads
+*.traineddata
+test-results
+playwright-report
+e2e
+.env
