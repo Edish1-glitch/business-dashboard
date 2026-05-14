@@ -7,8 +7,8 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Allow auth routes and login page
-  if (pathname.startsWith("/api/auth") || pathname === "/login") {
+  // Allow auth routes, login page, and debug
+  if (pathname.startsWith("/api/auth") || pathname === "/login" || pathname === "/api/debug-env") {
     return NextResponse.next();
   }
 
