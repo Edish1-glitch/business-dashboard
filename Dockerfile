@@ -10,47 +10,25 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install dependencies
-FROM base AS deps
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
-# Build
-FROM base AS builder
-WORKDIR /app
+# Copy everything and install
 COPY package.json package-lock.json ./
 RUN npm ci
+
 COPY . .
+
+# Generate Prisma client
 RUN npx prisma generate
+
+# Build Next.js
 RUN npm run build
 
-# Production
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-
+# Create uploads directory
 RUN mkdir -p /app/uploads
-
-# Copy standalone build
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
-# Copy prisma schema, config, and generated client
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/src/generated ./src/generated
-COPY --from=builder /app/scripts ./scripts
-COPY --from=builder /app/package.json ./package.json
-
-# Copy production node_modules + prisma CLI from builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV NODE_ENV=production
 
 # Push schema to DB then start server
-CMD ["sh", "-c", "node scripts/setup-db.mjs && node server.js"]
+CMD ["sh", "-c", "node scripts/setup-db.mjs && npm run start"]
