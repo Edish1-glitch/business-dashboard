@@ -56,6 +56,7 @@ export default function PendingInvoicesPage() {
   const [editData, setEditData] = useState<Partial<Invoice>>({});
   const [newCategoryName, setNewCategoryName] = useState("");
   const [showNewCategory, setShowNewCategory] = useState(false);
+  const [addingCategory, setAddingCategory] = useState(false);
   const [approving, setApproving] = useState<string | null>(null);
   const [approvingAll, setApprovingAll] = useState(false);
 
@@ -124,18 +125,23 @@ export default function PendingInvoicesPage() {
   };
 
   const addCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    const res = await fetch("/api/categories", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newCategoryName.trim() }),
-    });
-    const data = await res.json();
-    if (data.category) {
-      setCategories((prev) => [...prev, data.category]);
-      setEditData((prev) => ({ ...prev, category: data.category }));
-      setNewCategoryName("");
-      setShowNewCategory(false);
+    if (!newCategoryName.trim() || addingCategory) return;
+    setAddingCategory(true);
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCategoryName.trim() }),
+      });
+      const data = await res.json();
+      if (data.category) {
+        setCategories((prev) => [...prev, data.category]);
+        setEditData((prev) => ({ ...prev, category: data.category }));
+        setNewCategoryName("");
+        setShowNewCategory(false);
+      }
+    } finally {
+      setAddingCategory(false);
     }
   };
 
@@ -198,9 +204,9 @@ export default function PendingInvoicesPage() {
               className="rounded-2xl bg-card border border-amber-200 p-4 shadow-sm"
             >
               {isEditing ? (
-                /* Edit mode - side by side: image left, form right */
-                <div className="flex flex-col md:flex-row gap-4">
-                  {/* Preview image - left side */}
+                /* Edit mode - side by side: image left, form right (RTL: row-reverse) */
+                <div className="flex flex-col md:flex-row-reverse gap-4">
+                  {/* Preview image - left side (in RTL, row-reverse puts first item on left) */}
                   <div className="md:w-1/2 rounded-xl border border-border overflow-auto bg-white max-h-[600px] shrink-0">
                     <img
                       src={`/api/invoices/${inv.id}/preview`}
@@ -286,8 +292,8 @@ export default function PendingInvoicesPage() {
                               placeholder="שם קטגוריה חדשה"
                               className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm"
                             />
-                            <Button size="sm" onClick={addCategory}>
-                              הוסף
+                            <Button size="sm" onClick={addCategory} disabled={addingCategory}>
+                              {addingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : "הוסף"}
                             </Button>
                           </div>
                         )}
