@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useId } from "react";
-import { Menu, X, LogOut } from "lucide-react";
+import { useEffect, useId, useState } from "react";
+import { Menu, X, LogOut, Monitor } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -40,7 +40,8 @@ export function Header() {
   const title = pageTitles[pathname] || "FinDash";
   const checkboxId = useId();
   const { data: session } = useSession();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
 
   // Close menu on route change
   useEffect(() => {
@@ -102,13 +103,39 @@ export function Header() {
                   {session.user.name?.split(" ")[0]}
                 </span>
               </div>
-              <button
-                onClick={toggleTheme}
-                className="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                title={theme === "light" ? "מצב כהה" : "מצב בהיר"}
-              >
-                {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowThemeMenu(!showThemeMenu)}
+                  className="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  title="מצב תצוגה"
+                >
+                  {theme === "dark" ? <Moon className="h-4 w-4" /> : theme === "light" ? <Sun className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
+                </button>
+                {showThemeMenu && (
+                  <>
+                    <div className="fixed inset-0 z-50" onClick={() => setShowThemeMenu(false)} />
+                    <div className="absolute left-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-lg py-1 min-w-[140px]">
+                      {[
+                        { value: "light" as const, label: "בהיר", icon: Sun },
+                        { value: "dark" as const, label: "כהה", icon: Moon },
+                        { value: "system" as const, label: "מערכת", icon: Monitor },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => { setTheme(opt.value); setShowThemeMenu(false); }}
+                          className={cn(
+                            "flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors",
+                            theme === opt.value && "text-primary font-medium"
+                          )}
+                        >
+                          <opt.icon className="h-4 w-4" />
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"

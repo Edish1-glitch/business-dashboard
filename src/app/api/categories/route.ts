@@ -43,3 +43,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "שגיאה ביצירת קטגוריה" }, { status: 500 });
   }
 }
+
+// DELETE category
+export async function DELETE(request: NextRequest) {
+  try {
+    const { user, error } = await getAuthUser();
+    if (error) return error;
+
+    const { id } = await request.json();
+    if (!id) {
+      return NextResponse.json({ error: "מזהה קטגוריה חובה" }, { status: 400 });
+    }
+
+    // Unlink invoices and expenses from this category first
+    await prisma.invoice.updateMany({ where: { categoryId: id }, data: { categoryId: null } });
+    await prisma.expense.updateMany({ where: { categoryId: id }, data: { categoryId: null } });
+
+    await prisma.category.delete({ where: { id } });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Category delete error:", error);
+    return NextResponse.json({ error: "שגיאה במחיקת קטגוריה" }, { status: 500 });
+  }
+}

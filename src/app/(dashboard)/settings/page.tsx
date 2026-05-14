@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Tag, User, Plus, Loader2 } from "lucide-react";
+import { Tag, User, Plus, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Category {
@@ -23,6 +23,18 @@ export default function SettingsPage() {
       .then((d) => { setCategories(d.categories || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
+
+  const deleteCategory = async (id: string, name: string) => {
+    if (!confirm(`האם למחוק את הקטגוריה "${name}"? חשבוניות שמשויכות אליה יישארו ללא קטגוריה.`)) return;
+    const res = await fetch("/api/categories", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) {
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+    }
+  };
 
   const addCategory = async () => {
     if (!newCatName.trim()) return;
@@ -81,10 +93,17 @@ export default function SettingsPage() {
               {categories.map((cat) => (
                 <span
                   key={cat.id}
-                  className="px-3 py-1.5 rounded-full text-sm font-medium bg-muted"
+                  className="group flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-muted"
                   style={{ borderRight: `3px solid ${cat.color || "#9ca3af"}` }}
                 >
                   {cat.name}
+                  <button
+                    onClick={() => deleteCategory(cat.id, cat.name)}
+                    className="hidden group-hover:inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                    title="מחק קטגוריה"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               ))}
             </div>
