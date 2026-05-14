@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useId } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   FileText,
@@ -36,6 +37,7 @@ export function Header() {
   const pathname = usePathname();
   const title = pageTitles[pathname] || "FinDash";
   const checkboxId = useId();
+  const { data: session } = useSession();
 
   // Close menu on route change
   useEffect(() => {
@@ -79,6 +81,34 @@ export function Header() {
         </label>
 
         <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+
+        {/* User info + logout - pushed to left side */}
+        <div className="mr-auto flex items-center gap-3">
+          {session?.user && (
+            <>
+              <div className="hidden md:flex items-center gap-2">
+                {session.user.image && (
+                  <img
+                    src={session.user.image}
+                    alt=""
+                    className="w-8 h-8 rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <span className="text-sm text-muted-foreground">
+                  {session.user.name?.split(" ")[0]}
+                </span>
+              </div>
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title="התנתק"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       {/* Backdrop - direct sibling of checkbox so peer-checked works */}
