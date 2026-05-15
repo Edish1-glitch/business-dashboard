@@ -35,6 +35,30 @@ async function getStorageUsed(): Promise<number> {
   return totalBytes;
 }
 
+// GET: return sync ranges for user's accounts
+export async function GET() {
+  try {
+    const { user, error } = await getAuthUser();
+    if (error) return error;
+
+    const accounts = await prisma.emailAccount.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        email: true,
+        syncRanges: {
+          orderBy: { fromDate: "desc" },
+          select: { id: true, fromDate: true, toDate: true, invoicesFound: true, createdAt: true },
+        },
+      },
+    });
+
+    return NextResponse.json({ accounts });
+  } catch {
+    return NextResponse.json({ accounts: [] }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { user, error } = await getAuthUser();
@@ -42,32 +66,33 @@ export async function POST(request: NextRequest) {
 
     // Get sync parameters
     let afterDate = new Date("2024-01-01");
+    let toDate: Date | null = null;
+    let accountIds: string[] | null = null;
+
     try {
       const body = await request.json();
       if (body.afterDate) afterDate = new Date(body.afterDate);
-      if (body.accountId) {
-        // Sync specific account only
-        return syncAccounts(user.id, [body.accountId], afterDate);
-      }
+      if (body.toDate) toDate = new Date(body.toDate);
+      if (body.accountId) accountIds = [body.accountId];
     } catch { /* no body = sync all */ }
 
-    // Get all email accounts
+    // Get accounts
     const accounts = await prisma.emailAccount.findMany({
-      where: { userId: user.id },
+      where: accountIds ? { id: { in: accountIds }, userId: user.id } : { userId: user.id },
     });
 
     if (accounts.length === 0) {
       return NextResponse.json({ error: "אין חשבונות אימייל מחוברים" }, { status: 400 });
     }
 
-    return syncAccounts(user.id, accounts.map((a) => a.id), afterDate);
+    return syncAccounts(user.id, accounts.map((a) => a.id), afterDate, toDate);
   } catch (error) {
     console.error("Email sync error:", error);
     return NextResponse.json({ error: "שגיאה בסנכרון" }, { status: 500 });
   }
 }
 
-async function syncAccounts(userId: string, accountIds: string[], afterDate: Date) {
+async function syncAccounts(userId: string, accountIds: string[], afterDate: Date, toDate: Date | null = null) {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -121,7 +146,7 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
 
         let messageIds: string[];
         try {
-          messageIds = await searchEmails(gmail, syncFrom);
+          messageIds = await searchEmails(gmail, syncFrom, toDate);
         } catch (err) {
           send({
             type: "progress",
@@ -218,14 +243,24 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
           await new Promise((r) => setTimeout(r, 100));
         }
 
-        // Update lastSyncAt for this account
+        // Update lastSyncAt and save sync range
         if (lastProcessedDate || !stoppedEarly) {
+          const syncEndDate = stoppedEarly && lastProcessedDate
+            ? lastProcessedDate
+            : (toDate || new Date());
+
           await prisma.emailAccount.update({
             where: { id: account.id },
+            data: { lastSyncAt: syncEndDate },
+          });
+
+          // Save sync range for history
+          await prisma.syncRange.create({
             data: {
-              lastSyncAt: stoppedEarly && lastProcessedDate
-                ? lastProcessedDate
-                : new Date(),
+              fromDate: syncFrom,
+              toDate: syncEndDate,
+              invoicesFound: totalInvoicesFound,
+              emailAccountId: account.id,
             },
           });
         }

@@ -3,6 +3,7 @@ import { Heebo, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { SyncProvider } from "@/components/providers/SyncProvider";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -34,7 +35,9 @@ export default function RootLayout({
       <body className="min-h-full bg-background text-foreground" suppressHydrationWarning>
         <SessionProvider>
           <ThemeProvider>
-            {children}
+            <SyncProvider>
+              {children}
+            </SyncProvider>
           </ThemeProvider>
         </SessionProvider>
       </body>

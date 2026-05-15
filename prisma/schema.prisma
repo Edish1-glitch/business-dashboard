@@ -98,8 +98,21 @@ model EmailAccount {
   user         User     @relation(fields: [userId], references: [id])
   tokenExpiresAt DateTime?
   lastSyncAt   DateTime?
+  syncRanges   SyncRange[]
   createdAt    DateTime @default(now())
 
   @@unique([email, userId])
   @@index([userId])
+}
+
+model SyncRange {
+  id             String       @id @default(cuid())
+  fromDate       DateTime
+  toDate         DateTime
+  invoicesFound  Int          @default(0)
+  emailAccountId String
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([emailAccountId])
 }

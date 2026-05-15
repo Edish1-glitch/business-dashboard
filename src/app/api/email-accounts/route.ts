@@ -15,6 +15,11 @@ export async function GET() {
         provider: true,
         lastSyncAt: true,
         createdAt: true,
+        syncRanges: {
+          orderBy: { fromDate: "desc" },
+          take: 5,
+          select: { fromDate: true, toDate: true, invoicesFound: true, createdAt: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     });

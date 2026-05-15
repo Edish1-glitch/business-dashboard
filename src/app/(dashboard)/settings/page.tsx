@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Tag, User, Plus, Loader2, X, Play, Mail, RefreshCw, Trash2, Calendar } from "lucide-react";
+import { Tag, User, Plus, Loader2, X, Play, Mail, RefreshCw, Trash2, Calendar, AlertTriangle, Clock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useSyncContext } from "@/components/providers/SyncProvider";
 
 interface Category {
   id: string;
@@ -12,17 +13,26 @@ interface Category {
   color: string | null;
 }
 
+interface SyncRangeInfo {
+  fromDate: string;
+  toDate: string;
+  invoicesFound: number;
+  createdAt: string;
+}
+
 interface EmailAccount {
   id: string;
   email: string;
   provider: string;
   lastSyncAt: string | null;
+  syncRanges?: SyncRangeInfo[];
 }
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { syncState, startSync } = useSyncContext();
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -30,15 +40,21 @@ export default function SettingsPage() {
   // Email accounts
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
   const [loadingEmails, setLoadingEmails] = useState(true);
-  const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [syncProgress, setSyncProgress] = useState("");
-  const [syncPercent, setSyncPercent] = useState(0);
-  const [syncResult, setSyncResult] = useState<string | null>(null);
-  const [syncDate, setSyncDate] = useState("2024-01-01");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [syncFromDate, setSyncFromDate] = useState("2024-01-01");
+  const [syncToDate, setSyncToDate] = useState(new Date().toISOString().split("T")[0]);
+  const [showOverlapWarning, setShowOverlapWarning] = useState(false);
+  const [overlapMessage, setOverlapMessage] = useState("");
 
   // Gmail connection status from URL
   const gmailStatus = searchParams.get("gmail");
+
+  const fetchEmailAccounts = () => {
+    fetch("/api/email-accounts")
+      .then((r) => r.json())
+      .then((d) => { setEmailAccounts(d.accounts || []); setLoadingEmails(false); })
+      .catch(() => setLoadingEmails(false));
+  };
 
   useEffect(() => {
     fetch("/api/categories")
@@ -46,26 +62,23 @@ export default function SettingsPage() {
       .then((d) => { setCategories(d.categories || []); setLoading(false); })
       .catch(() => setLoading(false));
 
-    fetch("/api/email-accounts")
-      .then((r) => r.json())
-      .then((d) => { setEmailAccounts(d.accounts || []); setLoadingEmails(false); })
-      .catch(() => setLoadingEmails(false));
+    fetchEmailAccounts();
   }, []);
+
+  // Refresh accounts when sync finishes
+  useEffect(() => {
+    if (!syncState.isSyncing && syncState.result) {
+      fetchEmailAccounts();
+    }
+  }, [syncState.isSyncing, syncState.result]);
 
   // Show toast-like message for Gmail connection status
   useEffect(() => {
     if (gmailStatus) {
-      // Clean the URL
       const url = new URL(window.location.href);
       url.searchParams.delete("gmail");
       window.history.replaceState({}, "", url.toString());
-
-      if (gmailStatus === "connected") {
-        // Refresh email accounts
-        fetch("/api/email-accounts")
-          .then((r) => r.json())
-          .then((d) => setEmailAccounts(d.accounts || []));
-      }
+      if (gmailStatus === "connected") fetchEmailAccounts();
     }
   }, [gmailStatus]);
 
@@ -76,9 +89,7 @@ export default function SettingsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
-    if (res.ok) {
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-    }
+    if (res.ok) setCategories((prev) => prev.filter((c) => c.id !== id));
   };
 
   const addCategory = async () => {
@@ -102,67 +113,42 @@ export default function SettingsPage() {
     setDeletingId(null);
   };
 
-  const syncEmails = async (accountId?: string) => {
-    setSyncingId(accountId || "all");
-    setSyncProgress("מתחיל סנכרון...");
-    setSyncPercent(0);
-    setSyncResult(null);
+  // Check for overlapping sync ranges before starting
+  const checkOverlapAndSync = (accountId?: string) => {
+    const from = new Date(syncFromDate);
+    const to = new Date(syncToDate);
 
-    try {
-      const body: Record<string, string> = { afterDate: syncDate };
-      if (accountId) body.accountId = accountId;
+    // Check all accounts for overlap
+    const accounts = accountId
+      ? emailAccounts.filter((a) => a.id === accountId)
+      : emailAccounts;
 
-      const response = await fetch("/api/email-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+    for (const account of accounts) {
+      if (!account.syncRanges) continue;
+      for (const range of account.syncRanges) {
+        const rangeFrom = new Date(range.fromDate);
+        const rangeTo = new Date(range.toDate);
 
-      if (!response.ok) {
-        const data = await response.json();
-        setSyncResult(data.error || "שגיאה בסנכרון");
-        setSyncingId(null);
-        return;
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const msg = JSON.parse(line);
-              if (msg.type === "progress") {
-                setSyncProgress(msg.message);
-                setSyncPercent(msg.total > 0 ? (msg.current / msg.total) * 100 : 0);
-              } else if (msg.type === "done") {
-                setSyncResult(msg.message);
-                // Refresh accounts to update lastSyncAt
-                fetch("/api/email-accounts")
-                  .then((r) => r.json())
-                  .then((d) => setEmailAccounts(d.accounts || []));
-              }
-            } catch { /* ignore parse errors */ }
-          }
+        // Check overlap
+        if (from <= rangeTo && to >= rangeFrom) {
+          const rangeFromStr = rangeFrom.toLocaleDateString("he-IL");
+          const rangeToStr = rangeTo.toLocaleDateString("he-IL");
+          setOverlapMessage(
+            `הטווח שבחרת חופף לסנכרון קודם ב-${account.email} (${rangeFromStr} - ${rangeToStr}, ${range.invoicesFound} חשבוניות). חשבוניות כפולות ידולגו אוטומטית. להמשיך?`
+          );
+          setShowOverlapWarning(true);
+          return;
         }
       }
-    } catch {
-      setSyncResult("שגיאה בסנכרון");
-    } finally {
-      setSyncingId(null);
-      setSyncProgress("");
-      setSyncPercent(0);
     }
+
+    // No overlap - sync directly
+    doSync(accountId);
+  };
+
+  const doSync = (accountId?: string) => {
+    setShowOverlapWarning(false);
+    startSync({ afterDate: syncFromDate, toDate: syncToDate, accountId });
   };
 
   return (
@@ -183,6 +169,29 @@ export default function SettingsPage() {
       {(gmailStatus === "error" || gmailStatus === "expired") && (
         <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-red-800 text-sm">
           שגיאה בחיבור Gmail. נסה שוב.
+        </div>
+      )}
+
+      {/* Overlap warning dialog */}
+      {showOverlapWarning && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold mb-1">סנכרון חופף</h3>
+                <p className="text-sm text-muted-foreground">{overlapMessage}</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowOverlapWarning(false)}>
+                ביטול
+              </Button>
+              <Button size="sm" onClick={() => doSync()}>
+                המשך בכל זאת
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -234,69 +243,91 @@ export default function SettingsPage() {
         ) : (
           <div className="space-y-3">
             {emailAccounts.map((account) => (
-              <div
-                key={account.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/30"
-              >
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium">{account.email}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {account.lastSyncAt
-                      ? `סנכרון אחרון: ${new Date(account.lastSyncAt).toLocaleDateString("he-IL")}`
-                      : "טרם סונכרן"}
-                  </p>
+              <div key={account.id} className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/30">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">{account.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {account.lastSyncAt
+                        ? `סנכרון אחרון: ${new Date(account.lastSyncAt).toLocaleDateString("he-IL")}`
+                        : "טרם סונכרן"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => checkOverlapAndSync(account.id)}
+                      disabled={syncState.isSyncing}
+                    >
+                      {syncState.isSyncing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => disconnectEmail(account.id)}
+                      disabled={deletingId === account.id}
+                    >
+                      {deletingId === account.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => syncEmails(account.id)}
-                    disabled={!!syncingId}
-                  >
-                    {syncingId === account.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => disconnectEmail(account.id)}
-                    disabled={deletingId === account.id}
-                  >
-                    {deletingId === account.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+
+                {/* Sync history */}
+                {account.syncRanges && account.syncRanges.length > 0 && (
+                  <div className="mr-3 space-y-1">
+                    <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      היסטוריית סנכרונים
+                    </p>
+                    {account.syncRanges.map((range, i) => (
+                      <div key={i} className="text-[11px] text-muted-foreground flex items-center gap-2">
+                        <span>
+                          {new Date(range.fromDate).toLocaleDateString("he-IL")} - {new Date(range.toDate).toLocaleDateString("he-IL")}
+                        </span>
+                        <span className="text-xs font-medium">{range.invoicesFound} חשבוניות</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
 
             {/* Sync controls */}
             <div className="pt-2 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 flex-1">
-                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <label className="text-xs text-muted-foreground shrink-0">סנכרן מתאריך:</label>
-                  <input
-                    type="date"
-                    value={syncDate}
-                    onChange={(e) => setSyncDate(e.target.value)}
-                    className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
-                  />
-                </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <label className="text-xs text-muted-foreground shrink-0">מתאריך:</label>
+                <input
+                  type="date"
+                  value={syncFromDate}
+                  onChange={(e) => setSyncFromDate(e.target.value)}
+                  className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
+                />
+                <label className="text-xs text-muted-foreground shrink-0">עד:</label>
+                <input
+                  type="date"
+                  value={syncToDate}
+                  onChange={(e) => setSyncToDate(e.target.value)}
+                  className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
+                />
                 <Button
                   size="sm"
-                  onClick={() => syncEmails()}
-                  disabled={!!syncingId}
+                  onClick={() => checkOverlapAndSync()}
+                  disabled={syncState.isSyncing}
                   className="gap-2"
                 >
-                  {syncingId === "all" ? (
+                  {syncState.isSyncing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <RefreshCw className="h-4 w-4" />
@@ -305,30 +336,9 @@ export default function SettingsPage() {
                 </Button>
               </div>
 
-              {/* Progress bar */}
-              {syncingId && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground text-xs">{syncProgress}</span>
-                    {syncPercent > 0 && (
-                      <span className="font-medium text-xs">{Math.round(syncPercent)}%</span>
-                    )}
-                  </div>
-                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-300"
-                      style={{ width: `${Math.max(syncPercent, 2)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Sync result */}
-              {syncResult && (
-                <div className="rounded-xl bg-muted/50 p-3 text-sm whitespace-pre-line">
-                  {syncResult}
-                </div>
-              )}
+              <p className="text-[11px] text-muted-foreground">
+                הסנכרון רץ ברקע - ניתן לנווט לדפים אחרים וה-progress יופיע בחלון צף.
+              </p>
             </div>
           </div>
         )}

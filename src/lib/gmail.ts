@@ -106,15 +106,20 @@ export async function getGmailClient(
 }
 
 /**
- * Search Gmail for emails with PDF/image attachments after a given date.
+ * Search Gmail for emails with PDF/image attachments in a date range.
  * Returns all matching message IDs (no pagination cap).
  */
 export async function searchEmails(
   gmail: gmail_v1.Gmail,
-  afterDate: Date
+  afterDate: Date,
+  beforeDate?: Date | null
 ): Promise<string[]> {
-  const dateStr = `${afterDate.getFullYear()}/${String(afterDate.getMonth() + 1).padStart(2, "0")}/${String(afterDate.getDate()).padStart(2, "0")}`;
-  const query = `has:attachment (filename:pdf OR filename:jpg OR filename:jpeg OR filename:png) after:${dateStr}`;
+  const afterStr = `${afterDate.getFullYear()}/${String(afterDate.getMonth() + 1).padStart(2, "0")}/${String(afterDate.getDate()).padStart(2, "0")}`;
+  let query = `has:attachment (filename:pdf OR filename:jpg OR filename:jpeg OR filename:png) after:${afterStr}`;
+  if (beforeDate) {
+    const beforeStr = `${beforeDate.getFullYear()}/${String(beforeDate.getMonth() + 1).padStart(2, "0")}/${String(beforeDate.getDate()).padStart(2, "0")}`;
+    query += ` before:${beforeStr}`;
+  }
 
   const messageIds: string[] = [];
   let pageToken: string | undefined;
