@@ -49,7 +49,7 @@ async function processPage(
     data: {
       fileName,
       filePath,
-      fileData: buffer.toString("base64"),
+      fileData: buffer.length < 500000 ? buffer.toString("base64") : null, // Only store in DB if under 500KB
       vendor: invoiceData.vendor,
       amount: invoiceData.amount,
       date: invoiceData.date,

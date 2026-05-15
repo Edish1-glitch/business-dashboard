@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Tag, User, Plus, Loader2, X, Play } from "lucide-react";
-import { useTour } from "@/components/tour/TourProvider";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 interface Category {
@@ -14,7 +14,7 @@ interface Category {
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const { startTour } = useTour();
+  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -135,7 +135,7 @@ export default function SettingsPage() {
             <h3 className="text-base font-semibold">סיור באפליקציה</h3>
             <p className="text-sm text-muted-foreground">מדריך אינטראקטיבי שמציג את כל הפיצ׳רים</p>
           </div>
-          <Button onClick={startTour} className="gap-2">
+          <Button onClick={() => router.push("/tour")} className="gap-2">
             <Play className="h-4 w-4" />
             התחל סיור
           </Button>

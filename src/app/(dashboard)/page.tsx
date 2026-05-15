@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { categoryColors } from "@/lib/category-colors";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 
@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [showCustomDate, setShowCustomDate] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -112,29 +113,53 @@ export default function DashboardPage() {
       </div>
 
       {/* Date filter */}
-      <div data-tour="date-filter" className="flex flex-wrap items-center gap-3">
-        <Calendar className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">סנן לפי תאריך:</span>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
-        />
-        <span className="text-sm text-muted-foreground">עד</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
-        />
-        {(dateFrom || dateTo) && (
+      <div data-tour="date-filter" className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { label: "החודש", from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10), to: "" },
+            { label: "3 חודשים", from: new Date(new Date().setMonth(new Date().getMonth() - 3)).toISOString().slice(0, 10), to: "" },
+            { label: "שנה", from: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().slice(0, 10), to: "" },
+            { label: "הכל", from: "", to: "" },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              onClick={() => { setDateFrom(preset.from); setDateTo(preset.to); setShowCustomDate(false); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                dateFrom === preset.from && dateTo === preset.to
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted hover:bg-accent"
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
           <button
-            onClick={() => { setDateFrom(""); setDateTo(""); }}
-            className="text-xs text-primary hover:underline"
+            onClick={() => setShowCustomDate(!showCustomDate)}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              showCustomDate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"
+            }`}
           >
-            נקה
+            <Calendar className="h-3 w-3" />
+            התאמה אישית
           </button>
+        </div>
+        {showCustomDate && (
+          <div className="flex items-center gap-2 bg-muted/30 p-3 rounded-xl">
+            <span className="text-xs text-muted-foreground">מ-</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-8 rounded-lg border border-input bg-background px-2 text-xs"
+            />
+            <span className="text-xs text-muted-foreground">עד</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-8 rounded-lg border border-input bg-background px-2 text-xs"
+            />
+          </div>
         )}
       </div>
 
@@ -172,24 +197,28 @@ export default function DashboardPage() {
             <div className="rounded-2xl bg-card border border-border/50 p-5 shadow-sm">
               <h3 className="text-base font-semibold mb-4">הוצאות לפי קטגוריה</h3>
               {data && data.byCategory.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={data.byCategory}
                       dataKey="amount"
                       nameKey="name"
                       cx="50%"
-                      cy="50%"
-                      outerRadius={90}
-                      innerRadius={50}
+                      cy="45%"
+                      outerRadius={80}
+                      innerRadius={45}
                       paddingAngle={2}
-                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                     >
                       {data.byCategory.map((entry, i) => (
                         <Cell key={i} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value) => `₪${Number(value).toLocaleString("he-IL")}`} />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={50}
+                      formatter={(value) => <span className="text-xs">{value}</span>}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
