@@ -96,6 +96,7 @@ model EmailAccount {
   refreshToken String?
   userId       String
   user         User     @relation(fields: [userId], references: [id])
+  tokenExpiresAt DateTime?
   lastSyncAt   DateTime?
   createdAt    DateTime @default(now())
 
