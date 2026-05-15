@@ -13,7 +13,7 @@ npx playwright test --grep "Mobile"  # Run specific test group
 npx prisma generate           # Regenerate Prisma client (after schema changes)
 npx prisma db push            # Push schema to running DB
 DATABASE_URL="postgresql://findash:findash_dev_password@localhost:5432/findash?schema=public" npx tsx prisma/seed.ts  # Seed categories
-docker run -d --name findash-db -e POSTGRES_USER=findash -e POSTGRES_PASSWORD=findash_dev_password -e POSTGRES_DB=findash -p 5432:5432 postgres:16-alpine  # Start PostgreSQL
+brew services start postgresql@16  # Start local PostgreSQL (native, not Docker)
 ```
 
 ## Architecture
@@ -44,44 +44,73 @@ const { id } = await params;
 
 **Tailwind v4** uses `@theme inline` in CSS with OkLCH color space. See `src/app/globals.css`.
 
+### File Storage
+
+Files are stored in **Cloudflare R2** (S3-compatible). When R2 env vars are not set, falls back to base64 in DB.
+- `src/lib/r2.ts` — R2 client with built-in safety limits (5MB/file, 500MB/user, 100 uploads/day)
+- Upload: `uploadToR2()` → stores file, returns key
+- Download: `downloadFromR2(key)` → returns buffer
+- Invoice `filePath` starts with `r2://` for R2-stored files, `fileUrl` holds the R2 key
+- Preview/download APIs auto-detect source (R2 vs DB base64 vs local filesystem)
+
+Required env vars: `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
+
 ### Invoice Workflow
 
 Invoices follow a pending → approved flow:
-1. PDF uploaded → split into pages → OCR text extraction → auto-categorization
-2. Invoices saved with `status: "pending"` (no Expense record created yet)
-3. User reviews/edits on `/invoices/pending` page
+1. PDF/image uploaded → split into pages → OCR text extraction → auto-categorization
+2. Invoices saved with `status: "pending"` + file in R2 (no Expense record yet)
+3. User reviews/edits on `/invoices/pending` page (supports bulk select, approve, delete)
 4. On approval → Expense record created → counts in dashboard totals
 
 ### PDF Processing Pipeline
 
 `src/lib/pdf/split.ts` → splits PDF by page (pdf-lib)
 `src/lib/pdf/extract.ts` → text extraction (pdfjs-dist native, fallback: pdftoppm + tesseract OCR)
-`src/lib/pdf/categorize.ts` → regex-based extraction of: amount, date, vendor, category, credit card last 4 digits
+`src/lib/pdf/categorize.ts` → regex-based extraction of: amount, currency, date, vendor, category, credit card last 4 digits
+
+**Supports both Israeli and international invoices:**
+- Israeli: ₪, NIS, סה"כ כולל מע"מ, DD/MM/YYYY
+- International: $, €, £, USD/EUR/GBP, Total/Amount Due, Jan-Dec months, ISO dates
+- 13 categories including "תוכנה" (software/SaaS: Anthropic, AWS, GitHub, etc.)
 
 OCR requires `poppler` installed locally (`brew install poppler`) for `pdftoppm`.
+
+### Auth
+
+Google OAuth via NextAuth.js v4. Session callback auto-creates user in DB if missing.
+See `src/lib/auth.ts` for config, `src/lib/api-auth.ts` for API route helper.
 
 ### Sidebar Active State
 
 Routes with sub-routes (like `/invoices` which has `/invoices/pending`) use `exact: true` flag to prevent both from highlighting. See navItems in `Sidebar.tsx` and `Header.tsx`.
 
-### Temp Auth
-
-All API routes use `TEMP_USER_ID = "temp-user-1"` — no real auth yet. Default user created via upsert on first API call.
-
 ## API Routes
 
-- `POST /api/pdf-split` — upload PDF, split + OCR + categorize, save as pending
+- `POST /api/upload-invoices` — upload files (PDF/images), OCR + categorize, save to R2, streaming progress
 - `GET /api/invoices?status=pending&categoryId=X&from=DATE&to=DATE` — list invoices
 - `PATCH /api/invoices/[id]` — edit invoice fields
+- `DELETE /api/invoices/[id]` — delete invoice + R2 file + associated expenses
 - `POST /api/invoices/[id]/approve` — approve invoice → creates Expense
+- `POST /api/invoices/bulk` — bulk approve or delete: `{ action: "approve"|"delete", ids: [...] }`
 - `POST /api/invoices/approve-all` — batch approve all pending
-- `GET /api/invoices/[id]/download` — download invoice PDF
+- `GET /api/invoices/[id]/preview` — preview as image (supports R2/DB/local)
+- `GET /api/invoices/[id]/download` — download file (supports R2/DB/local)
+- `GET /api/dashboard` — summary stats, charts data, recent invoices
+- `GET /api/pending-count` — pending invoice count for sidebar badge
 - `GET/POST /api/categories` — list/create categories
 
 ## Database
 
-12 default Hebrew categories seeded: דלק, סופר, מסעדות, תחבורה, ביטוח, תקשורת, חשמל ומים, שכירות, ציוד משרדי, שיווק ופרסום, מיסים, אחר.
+13 default Hebrew categories seeded: דלק, סופר, מסעדות, תחבורה, ביטוח, תקשורת, חשמל ומים, שכירות, ציוד משרדי, שיווק ופרסום, מיסים, תוכנה, אחר.
 
 Key relationships: Invoice → Category, Invoice → Expenses (1:many), Expense → CreditCard (optional).
+
+Invoice has `currency` field (ILS/USD/EUR/GBP) for international invoice support.
+
+## Deployment
+
+Deployed on Render (Docker + PostgreSQL). Cloudflare R2 for file storage.
+R2 env vars must be set on Render for production file storage.
 
 @AGENTS.md

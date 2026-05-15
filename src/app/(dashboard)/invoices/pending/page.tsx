@@ -14,6 +14,9 @@ import {
   Pencil,
   X,
   Plus,
+  Trash2,
+  Square,
+  CheckSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -45,7 +48,9 @@ export default function PendingInvoicesPage() {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [addingCategory, setAddingCategory] = useState(false);
   const [approving, setApproving] = useState<string | null>(null);
-  const [approvingAll, setApprovingAll] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [bulkAction, setBulkAction] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -63,12 +68,30 @@ export default function PendingInvoicesPage() {
       setInvoices([]);
     } finally {
       setLoading(false);
+      setSelected(new Set());
     }
   }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === invoices.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(invoices.map((i) => i.id)));
+    }
+  };
 
   const startEdit = (inv: Invoice) => {
     setEditingId(inv.id);
@@ -104,10 +127,34 @@ export default function PendingInvoicesPage() {
     fetchData();
   };
 
-  const approveAll = async () => {
-    setApprovingAll(true);
-    await fetch("/api/invoices/approve-all", { method: "POST" });
-    setApprovingAll(false);
+  const deleteOne = async (id: string) => {
+    setDeleting(id);
+    await fetch(`/api/invoices/${id}`, { method: "DELETE" });
+    setDeleting(null);
+    fetchData();
+  };
+
+  const bulkApprove = async () => {
+    if (selected.size === 0) return;
+    setBulkAction(true);
+    await fetch("/api/invoices/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "approve", ids: [...selected] }),
+    });
+    setBulkAction(false);
+    fetchData();
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return;
+    setBulkAction(true);
+    await fetch("/api/invoices/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", ids: [...selected] }),
+    });
+    setBulkAction(false);
     fetchData();
   };
 
@@ -156,6 +203,8 @@ export default function PendingInvoicesPage() {
     );
   }
 
+  const allSelected = selected.size === invoices.length;
+
   return (
     <div data-tour="pending-list" className="space-y-6 max-w-5xl mx-auto">
       {/* Header */}
@@ -166,34 +215,77 @@ export default function PendingInvoicesPage() {
             {invoices.length} חשבוניות ממתינות לבדיקה ואישור
           </p>
         </div>
+      </div>
+
+      {/* Bulk action bar */}
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
-          onClick={approveAll}
-          disabled={approvingAll}
-          className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+          variant="outline"
+          size="sm"
+          onClick={toggleSelectAll}
+          className="gap-2"
         >
-          {approvingAll ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+          {allSelected ? (
+            <CheckSquare className="h-4 w-4" />
           ) : (
-            <CheckCheck className="h-4 w-4" />
+            <Square className="h-4 w-4" />
           )}
-          אשר הכל
+          {allSelected ? "בטל בחירה" : "בחר הכל"}
         </Button>
+
+        {selected.size > 0 && (
+          <>
+            <span className="text-sm text-muted-foreground">
+              {selected.size} נבחרו
+            </span>
+            <Button
+              size="sm"
+              onClick={bulkApprove}
+              disabled={bulkAction}
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+            >
+              {bulkAction ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCheck className="h-4 w-4" />
+              )}
+              אשר נבחרים
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={bulkDelete}
+              disabled={bulkAction}
+              className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+            >
+              {bulkAction ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              מחק נבחרים
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Invoice cards */}
       <div className="grid gap-3">
         {invoices.map((inv) => {
           const isEditing = editingId === inv.id;
+          const isSelected = selected.has(inv.id);
 
           return (
             <div
               key={inv.id}
-              className="rounded-2xl bg-card border border-amber-200 p-4 shadow-sm"
+              className={`rounded-2xl bg-card border p-4 shadow-sm transition-colors ${
+                isSelected ? "border-primary bg-primary/5" : "border-amber-200"
+              }`}
             >
               {isEditing ? (
                 /* Edit mode - side by side: image left, form right (RTL: row-reverse) */
                 <div className="flex flex-col md:flex-row-reverse gap-4">
-                  {/* Preview image - left side (in RTL, row-reverse puts first item on left) */}
+                  {/* Preview image */}
                   <div className="md:w-1/2 rounded-xl border border-border overflow-auto bg-white max-h-[600px] shrink-0">
                     <img
                       src={`/api/invoices/${inv.id}/preview`}
@@ -203,7 +295,7 @@ export default function PendingInvoicesPage() {
                     />
                   </div>
 
-                  {/* Form - right side */}
+                  {/* Form */}
                   <div className="md:w-1/2 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -299,50 +391,77 @@ export default function PendingInvoicesPage() {
               ) : (
                 /* View mode */
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold">
-                        {inv.vendor || inv.fileName}
-                      </span>
-                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                        ממתין
-                      </span>
-                    </div>
+                  {/* Checkbox + info */}
+                  <div className="flex items-start gap-3 flex-1">
+                    <button
+                      onClick={() => toggleSelect(inv.id)}
+                      className="mt-1 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="h-5 w-5 text-primary" />
+                      ) : (
+                        <Square className="h-5 w-5" />
+                      )}
+                    </button>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-semibold">
+                          {inv.vendor || inv.fileName}
+                        </span>
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                          ממתין
+                        </span>
+                      </div>
 
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
-                      {inv.amount !== null && (
-                        <span className="font-bold text-lg">
-                          ₪{inv.amount.toLocaleString("he-IL")}
-                        </span>
-                      )}
-                      {inv.date && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {new Date(inv.date).toLocaleDateString("he-IL")}
-                        </span>
-                      )}
-                      {inv.category && (
-                        <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
-                          <Tag className="h-3 w-3" />
-                          {inv.category.name}
-                        </span>
-                      )}
-                      {inv.creditCardLast4 && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <CreditCard className="h-3.5 w-3.5" />
-                          ****{inv.creditCardLast4}
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                        {inv.amount !== null && (
+                          <span className="font-bold text-lg">
+                            ₪{inv.amount.toLocaleString("he-IL")}
+                          </span>
+                        )}
+                        {inv.date && (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {new Date(inv.date).toLocaleDateString("he-IL")}
+                          </span>
+                        )}
+                        {inv.category && (
+                          <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
+                            <Tag className="h-3 w-3" />
+                            {inv.category.name}
+                          </span>
+                        )}
+                        {inv.creditCardLast4 && (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <CreditCard className="h-3.5 w-3.5" />
+                            ****{inv.creditCardLast4}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
+                  {/* Actions */}
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
                       <Download className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => startEdit(inv)}>
                       <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => deleteOne(inv.id)}
+                      disabled={deleting === inv.id}
+                    >
+                      {deleting === inv.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                     <Button
                       size="icon"

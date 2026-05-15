@@ -10,10 +10,11 @@ export const categoryColors: Record<string, string> = {
   "ציוד משרדי": "bg-slate-100 text-slate-700",
   "שיווק ופרסום": "bg-rose-100 text-rose-700",
   מיסים: "bg-purple-100 text-purple-700",
+  תוכנה: "bg-sky-100 text-sky-700",
   אחר: "bg-gray-100 text-gray-700",
 };
 
 export const categoryList = [
   "דלק", "סופר", "מסעדות", "תחבורה", "ביטוח", "תקשורת",
-  "חשמל ומים", "שכירות", "ציוד משרדי", "שיווק ופרסום", "מיסים", "אחר",
+  "חשמל ומים", "שכירות", "ציוד משרדי", "שיווק ופרסום", "מיסים", "תוכנה", "אחר",
 ];

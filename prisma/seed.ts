@@ -16,6 +16,7 @@ const defaultCategories = [
   { name: "ציוד משרדי", icon: "Briefcase", color: "#64748b" },
   { name: "שיווק ופרסום", icon: "Megaphone", color: "#f43f5e" },
   { name: "מיסים", icon: "Landmark", color: "#7c3aed" },
+  { name: "תוכנה", icon: "Monitor", color: "#0ea5e9" },
   { name: "אחר", icon: "MoreHorizontal", color: "#9ca3af" },
 ];
 

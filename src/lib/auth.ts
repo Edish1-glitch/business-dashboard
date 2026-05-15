@@ -31,12 +31,18 @@ export const authOptions: NextAuthOptions = {
       if (session.user?.email) {
         try {
           const { prisma } = await import("@/lib/db");
-          const dbUser = await prisma.user.findUnique({
+          let dbUser = await prisma.user.findUnique({
             where: { email: session.user.email },
           });
-          if (dbUser) {
-            (session.user as { id?: string }).id = dbUser.id;
+          if (!dbUser) {
+            dbUser = await prisma.user.create({
+              data: {
+                email: session.user.email,
+                name: session.user.name || "משתמש",
+              },
+            });
           }
+          (session.user as { id?: string }).id = dbUser.id;
         } catch (e) {
           console.error("Failed to get user:", e);
         }

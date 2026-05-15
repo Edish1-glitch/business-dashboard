@@ -71,6 +71,7 @@ model Invoice {
   fileHash        String?   // SHA-256 hash for duplicate detection
   vendor          String?
   amount          Float?
+  currency        String?   @default("ILS") // ILS, USD, EUR, GBP
   date            DateTime?
   source          String    // "email", "pdf-upload", "green-invoice"
   status          String    @default("pending") // "pending", "approved", "rejected"

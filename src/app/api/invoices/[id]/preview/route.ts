@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { readFile } from "fs/promises";
+import { downloadFromR2 } from "@/lib/r2";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { writeFile, mkdtemp, rm } from "fs/promises";
@@ -8,6 +9,23 @@ import path from "path";
 import os from "os";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Get file buffer from R2, DB (base64), or local filesystem.
+ */
+async function getFileBuffer(invoice: { fileData: string | null; fileUrl: string | null; filePath: string }): Promise<Buffer> {
+  // R2 storage
+  if (invoice.fileUrl && invoice.filePath.startsWith("r2://")) {
+    const { buffer } = await downloadFromR2(invoice.fileUrl);
+    return buffer;
+  }
+  // DB base64
+  if (invoice.fileData) {
+    return Buffer.from(invoice.fileData, "base64");
+  }
+  // Local filesystem fallback
+  return await readFile(invoice.filePath);
+}
 
 export async function GET(
   _request: NextRequest,
@@ -21,13 +39,7 @@ export async function GET(
   }
 
   try {
-    // Get file buffer from DB or filesystem
-    let fileBuffer: Buffer;
-    if (invoice.fileData) {
-      fileBuffer = Buffer.from(invoice.fileData, "base64");
-    } else {
-      fileBuffer = await readFile(invoice.filePath);
-    }
+    const fileBuffer = await getFileBuffer(invoice);
 
     // If it's an image, return directly
     const isImage = invoice.fileName.match(/\.(jpg|jpeg|png|webp)$/i);

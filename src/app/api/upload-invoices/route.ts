@@ -6,6 +6,7 @@ import { ocrFromImage } from "@/lib/pdf/ocr-image";
 import { extractInvoiceData } from "@/lib/pdf/categorize";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/api-auth";
+import { uploadToR2, isR2Configured, R2_LIMITS } from "@/lib/r2";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
@@ -16,7 +17,8 @@ async function processAndSave(
   fileName: string,
   uploadsDir: string,
   userId: string,
-  isImage: boolean
+  isImage: boolean,
+  useR2: boolean
 ) {
   const fileHash = createHash("sha256").update(buffer).digest("hex");
 
@@ -31,6 +33,11 @@ async function processAndSave(
     };
   }
 
+  // Safety: check file size
+  if (buffer.length > R2_LIMITS.MAX_FILE_SIZE) {
+    throw new Error(`קובץ גדול מדי (${(buffer.length / 1024 / 1024).toFixed(1)}MB). מקסימום ${R2_LIMITS.MAX_FILE_SIZE / 1024 / 1024}MB`);
+  }
+
   // OCR + extract data
   let text = "";
   try {
@@ -38,9 +45,24 @@ async function processAndSave(
   } catch { /* continue */ }
   const invoiceData = extractInvoiceData(text);
 
-  // Save file
-  const filePath = path.join(uploadsDir, fileName);
-  await writeFile(filePath, buffer);
+  // Save file - R2 or local+DB fallback
+  let filePath = "";
+  let fileUrl: string | null = null;
+  let fileData: string | null = null;
+  const contentType = isImage
+    ? `image/${path.extname(fileName).slice(1).replace("jpg", "jpeg")}`
+    : "application/pdf";
+
+  if (useR2) {
+    const r2Result = await uploadToR2(buffer, fileName, userId, contentType);
+    fileUrl = r2Result.key; // store R2 key in fileUrl field
+    filePath = `r2://${r2Result.key}`;
+  } else {
+    // Fallback: save locally + base64 in DB
+    filePath = path.join(uploadsDir, fileName);
+    await writeFile(filePath, buffer);
+    fileData = buffer.toString("base64");
+  }
 
   // Find category
   let categoryId: string | null = null;
@@ -58,13 +80,13 @@ async function processAndSave(
     if (similar) similarWarning = "חשבונית דומה כבר קיימת";
   }
 
-  // Save to DB with file data
+  // Save to DB
   const invoice = await prisma.invoice.create({
     data: {
-      fileName, filePath, fileHash,
-      fileData: buffer.toString("base64"),
+      fileName, filePath, fileHash, fileUrl, fileData,
       vendor: invoiceData.vendor,
       amount: invoiceData.amount,
+      currency: invoiceData.currency || "ILS",
       date: invoiceData.date,
       source: isImage ? "image-upload" : "pdf-upload",
       status: "pending",
@@ -93,11 +115,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "יש להעלות לפחות קובץ אחד" }, { status: 400 });
     }
 
+    // Safety: max files per upload
+    if (files.length > R2_LIMITS.MAX_FILES_PER_UPLOAD) {
+      return NextResponse.json({
+        error: `מקסימום ${R2_LIMITS.MAX_FILES_PER_UPLOAD} קבצים בהעלאה אחת`
+      }, { status: 400 });
+    }
+
     const { user, error } = await getAuthUser();
     if (error) return error;
 
+    // Safety: check daily upload limit
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayUploads = await prisma.invoice.count({
+      where: { userId: user.id, createdAt: { gte: today } },
+    });
+    if (todayUploads >= R2_LIMITS.MAX_UPLOADS_PER_DAY) {
+      return NextResponse.json({
+        error: `הגעת למגבלת ההעלאה היומית (${R2_LIMITS.MAX_UPLOADS_PER_DAY} קבצים). נסה שוב מחר.`
+      }, { status: 429 });
+    }
+
+    const useR2 = isR2Configured();
     const uploadsDir = path.join(process.cwd(), "uploads", Date.now().toString());
-    await mkdir(uploadsDir, { recursive: true });
+    if (!useR2) {
+      await mkdir(uploadsDir, { recursive: true });
+    }
 
     // Use streaming to send progress updates
     const encoder = new TextEncoder();
@@ -145,8 +189,17 @@ export async function POST(request: NextRequest) {
             JSON.stringify({ type: "progress", total: totalPages, current: processed, message: `מעבד חשבונית ${processed} מתוך ${totalPages}...` }) + "\n"
           ));
 
-          const result = await processAndSave(page.buffer, page.fileName, uploadsDir, user.id, page.isImage);
-          results.push({ ...result, page: processed, sourceFile: page.sourceFile });
+          try {
+            const result = await processAndSave(page.buffer, page.fileName, uploadsDir, user.id, page.isImage, useR2);
+            results.push({ ...result, page: processed, sourceFile: page.sourceFile });
+          } catch (err) {
+            results.push({
+              id: null, fileName: page.fileName, vendor: null, amount: null,
+              date: null, category: null, creditCardLast4: null,
+              duplicate: false, message: err instanceof Error ? err.message : "שגיאה בעיבוד",
+              similarWarning: null, page: processed, sourceFile: page.sourceFile,
+            });
+          }
         }
 
         // Send final result
