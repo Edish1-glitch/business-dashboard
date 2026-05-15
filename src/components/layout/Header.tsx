@@ -42,6 +42,21 @@ export function Header() {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/pending-count")
+      .then((r) => r.json())
+      .then((d) => setPendingCount(d.count || 0))
+      .catch(() => {});
+    const interval = setInterval(() => {
+      fetch("/api/pending-count")
+        .then((r) => r.json())
+        .then((d) => setPendingCount(d.count || 0))
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Close menu on route change
   useEffect(() => {
@@ -207,7 +222,12 @@ export function Header() {
                 )}
               >
                 <item.icon className="h-[18px] w-[18px] shrink-0 pointer-events-none" />
-                <span>{item.label}</span>
+                <span className="flex-1">{item.label}</span>
+                {item.href === "/invoices/pending" && pendingCount > 0 && (
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}
