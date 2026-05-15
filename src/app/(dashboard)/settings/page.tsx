@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { Tag, User, Plus, Loader2, X, Play, Mail, RefreshCw, Trash2, Calendar, AlertTriangle, Clock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -28,7 +28,15 @@ interface EmailAccount {
   syncRanges?: SyncRangeInfo[];
 }
 
-export default function SettingsPage() {
+export default function SettingsPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <SettingsPage />
+    </Suspense>
+  );
+}
+
+function SettingsPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
