@@ -390,12 +390,12 @@ export default function PendingInvoicesPage() {
                 </div>
               ) : (
                 /* View mode */
-                <div className="flex items-start justify-between gap-4">
-                  {/* Checkbox + info */}
-                  <div className="flex items-start gap-3 flex-1">
+                <div className="space-y-3">
+                  {/* Top row: checkbox + vendor + status */}
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => toggleSelect(inv.id)}
-                      className="mt-1 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                      className="shrink-0 text-muted-foreground hover:text-foreground transition-colors min-w-[24px] min-h-[24px] flex items-center justify-center"
                     >
                       {isSelected ? (
                         <CheckSquare className="h-5 w-5 text-primary" />
@@ -403,76 +403,77 @@ export default function PendingInvoicesPage() {
                         <Square className="h-5 w-5" />
                       )}
                     </button>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-semibold">
-                          {inv.vendor || inv.fileName}
-                        </span>
-                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                          ממתין
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
-                        {inv.amount !== null && (
-                          <span className="font-bold text-lg">
-                            ₪{inv.amount.toLocaleString("he-IL")}
-                          </span>
-                        )}
-                        {inv.date && (
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <Calendar className="h-3.5 w-3.5" />
-                            {new Date(inv.date).toLocaleDateString("he-IL")}
-                          </span>
-                        )}
-                        {inv.category && (
-                          <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
-                            <Tag className="h-3 w-3" />
-                            {inv.category.name}
-                          </span>
-                        )}
-                        {inv.creditCardLast4 && (
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <CreditCard className="h-3.5 w-3.5" />
-                            ****{inv.creditCardLast4}
-                          </span>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-semibold truncate">
+                        {inv.vendor || inv.fileName}
+                      </span>
                     </div>
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium shrink-0">
+                      ממתין
+                    </span>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => startEdit(inv)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                  {/* Details row */}
+                  <div className="flex flex-wrap items-center gap-2 text-sm mr-9">
+                    {inv.amount !== null && (
+                      <span className="font-bold text-base">
+                        ₪{inv.amount.toLocaleString("he-IL")}
+                      </span>
+                    )}
+                    {inv.date && (
+                      <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(inv.date).toLocaleDateString("he-IL")}
+                      </span>
+                    )}
+                    {inv.category && (
+                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
+                        <Tag className="h-2.5 w-2.5" />
+                        {inv.category.name}
+                      </span>
+                    )}
+                    {inv.creditCardLast4 && (
+                      <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                        <CreditCard className="h-3 w-3" />
+                        {inv.creditCardLast4}****
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions row - always on its own line */}
+                  <div className="flex items-center gap-2 mr-9">
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => deleteOne(inv.id)}
-                      disabled={deleting === inv.id}
-                    >
-                      {deleting === inv.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      size="icon"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      size="sm"
+                      className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs"
                       onClick={() => approveOne(inv.id)}
                       disabled={approving === inv.id}
                     >
                       {approving === inv.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
-                        <CheckCircle2 className="h-4 w-4" />
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      )}
+                      אשר
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={() => startEdit(inv)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                      ערוך
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => deleteOne(inv.id)}
+                      disabled={deleting === inv.id}
+                    >
+                      {deleting === inv.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
                       )}
                     </Button>
                   </div>
