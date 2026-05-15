@@ -33,6 +33,7 @@ interface InvoiceResult {
 export default function UploadPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState("");
+  const [progressPercent, setProgressPercent] = useState(0);
   const [results, setResults] = useState<InvoiceResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -64,26 +65,59 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       selectedFiles.forEach((file) => formData.append("files", file));
+      setProgressPercent(0);
 
       const response = await fetch("/api/upload-invoices", {
         method: "POST",
         body: formData,
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         setError(data.error || "שגיאה בעיבוד הקבצים");
         return;
       }
 
-      setResults(data.invoices);
-      setSelectedFiles([]);
+      // Read streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let finalData = null;
+
+      if (reader) {
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const msg = JSON.parse(line);
+              if (msg.type === "progress") {
+                setProgress(msg.message);
+                setProgressPercent(msg.total > 0 ? (msg.current / msg.total) * 100 : 0);
+              } else if (msg.type === "done") {
+                finalData = msg;
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      }
+
+      if (finalData) {
+        setResults(finalData.invoices);
+        setSelectedFiles([]);
+      }
     } catch {
       setError("שגיאה בהעלאת הקבצים");
     } finally {
       setIsProcessing(false);
       setProgress("");
+      setProgressPercent(0);
     }
   };
 
@@ -160,7 +194,7 @@ export default function UploadPage() {
               {isProcessing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {progress}
+                  מעבד...
                 </>
               ) : (
                 <>
@@ -193,6 +227,22 @@ export default function UploadPage() {
                 </Button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Progress bar */}
+      {isProcessing && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{progress}</span>
+            <span className="font-medium">{Math.round(progressPercent)}%</span>
+          </div>
+          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
         </div>
       )}
