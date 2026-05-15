@@ -14,7 +14,7 @@ export default function DashboardLayout({
       <Sidebar />
       <div className="md:mr-64 min-h-screen flex flex-col">
         <Header />
-        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 p-2 sm:p-4 md:p-6 lg:p-8">{children}</main>
       </div>
       <SyncFloatingWidget />
       <Onboarding />

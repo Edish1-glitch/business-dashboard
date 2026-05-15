@@ -206,7 +206,7 @@ export default function PendingInvoicesPage() {
   const allSelected = selected.size === invoices.length;
 
   return (
-    <div data-tour="pending-list" className="space-y-6 max-w-5xl mx-auto">
+    <div data-tour="pending-list" className="space-y-3 md:space-y-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -278,7 +278,7 @@ export default function PendingInvoicesPage() {
           return (
             <div
               key={inv.id}
-              className={`rounded-2xl bg-card border p-4 shadow-sm transition-colors ${
+              className={`rounded-xl bg-card border p-3 shadow-sm transition-colors ${
                 isSelected ? "border-primary bg-primary/5" : "border-amber-200"
               }`}
             >
@@ -389,92 +389,70 @@ export default function PendingInvoicesPage() {
                   </div>
                 </div>
               ) : (
-                /* View mode */
-                <div className="space-y-3">
-                  {/* Top row: checkbox + vendor + status */}
-                  <div className="flex items-center gap-3">
+                /* View mode - compact mobile-first layout */
+                <div className="space-y-1.5">
+                  {/* Row 1: checkbox + vendor name */}
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleSelect(inv.id)}
-                      className="shrink-0 text-muted-foreground hover:text-foreground transition-colors min-w-[24px] min-h-[24px] flex items-center justify-center"
+                      className="shrink-0 p-0.5 text-muted-foreground hover:text-foreground"
                     >
                       {isSelected ? (
-                        <CheckSquare className="h-5 w-5 text-primary" />
+                        <CheckSquare className="h-[18px] w-[18px] text-primary" />
                       ) : (
-                        <Square className="h-5 w-5" />
+                        <Square className="h-[18px] w-[18px]" />
                       )}
                     </button>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="font-semibold truncate">
-                        {inv.vendor || inv.fileName}
-                      </span>
-                    </div>
-                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium shrink-0">
-                      ממתין
+                    <span className="font-semibold text-[13px] truncate flex-1">
+                      {inv.vendor || inv.fileName}
                     </span>
                   </div>
 
-                  {/* Details row */}
-                  <div className="flex flex-wrap items-center gap-2 text-sm mr-9">
+                  {/* Row 2: amount + date + category + card */}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pr-6 text-[12px]">
                     {inv.amount !== null && (
-                      <span className="font-bold text-base">
-                        ₪{inv.amount.toLocaleString("he-IL")}
-                      </span>
+                      <span className="font-bold">₪{inv.amount.toLocaleString("he-IL")}</span>
                     )}
                     {inv.date && (
-                      <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(inv.date).toLocaleDateString("he-IL")}
-                      </span>
+                      <span className="text-muted-foreground">{new Date(inv.date).toLocaleDateString("he-IL")}</span>
                     )}
                     {inv.category && (
-                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
-                        <Tag className="h-2.5 w-2.5" />
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
                         {inv.category.name}
                       </span>
                     )}
                     {inv.creditCardLast4 && (
-                      <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                        <CreditCard className="h-3 w-3" />
-                        {inv.creditCardLast4}****
-                      </span>
+                      <span className="text-muted-foreground">****{inv.creditCardLast4}</span>
                     )}
                   </div>
 
-                  {/* Actions row - always on its own line */}
-                  <div className="flex items-center gap-2 mr-9">
+                  {/* Row 3: actions */}
+                  <div className="flex items-center gap-1 pr-6 pt-0.5">
                     <Button
                       size="sm"
-                      className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs"
+                      className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-[11px] px-2"
                       onClick={() => approveOne(inv.id)}
                       disabled={approving === inv.id}
                     >
-                      {approving === inv.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                      )}
+                      {approving === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                       אשר
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={() => startEdit(inv)}>
-                      <Pencil className="h-3.5 w-3.5" />
+                    <Button variant="outline" size="sm" className="gap-1 h-7 text-[11px] px-2" onClick={() => startEdit(inv)}>
+                      <Pencil className="h-3 w-3" />
                       ערוך
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
-                      <Download className="h-3.5 w-3.5" />
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")}>
+                      <Download className="h-3 w-3" />
                     </Button>
+                    <div className="flex-1" />
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 text-xs px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                       onClick={() => deleteOne(inv.id)}
                       disabled={deleting === inv.id}
                     >
-                      {deleting === inv.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
+                      {deleting === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                     </Button>
                   </div>
                 </div>
