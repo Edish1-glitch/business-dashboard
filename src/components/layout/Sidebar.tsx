@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -49,6 +50,22 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/pending-count")
+      .then((r) => r.json())
+      .then((d) => setPendingCount(d.count || 0))
+      .catch(() => {});
+    // Refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetch("/api/pending-count")
+        .then((r) => r.json())
+        .then((d) => setPendingCount(d.count || 0))
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-sidebar">
@@ -88,7 +105,12 @@ export function Sidebar() {
               )}
             >
               <item.icon className="h-[18px] w-[18px] shrink-0" />
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.href === "/invoices/pending" && pendingCount > 0 && (
+                <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                  {pendingCount}
+                </span>
+              )}
             </Link>
           );
         })}

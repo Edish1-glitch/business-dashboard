@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { splitPdfToPages } from "@/lib/pdf/split";
 import { extractTextFromPdf } from "@/lib/pdf/extract";
 import { ocrFromImage } from "@/lib/pdf/ocr-image";
@@ -10,53 +11,50 @@ import path from "path";
 
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic"];
 
-async function processPage(
+// Phase 1: Save invoice immediately (no OCR - fast)
+async function saveInvoice(
   buffer: Buffer,
   fileName: string,
   uploadsDir: string,
   userId: string,
   isImage: boolean
-): Promise<{
-  id: string;
-  fileName: string;
-  vendor: string | null;
-  amount: number | null;
-  date: string | null;
-  category: string | null;
-  creditCardLast4: string | null;
-}> {
-  // Extract text
-  let text = "";
-  try {
-    text = isImage ? await ocrFromImage(buffer) : await extractTextFromPdf(buffer);
-  } catch { /* continue with empty text */ }
+) {
+  const fileHash = createHash("sha256").update(buffer).digest("hex");
 
-  const invoiceData = extractInvoiceData(text);
+  // Check for exact duplicate
+  const exactDup = await prisma.invoice.findFirst({
+    where: { fileHash, userId },
+  });
+  if (exactDup) {
+    return {
+      id: exactDup.id,
+      fileName,
+      vendor: exactDup.vendor,
+      amount: exactDup.amount,
+      date: exactDup.date?.toISOString() || null,
+      category: null,
+      creditCardLast4: exactDup.creditCardLast4,
+      duplicate: true,
+      duplicateType: "exact" as const,
+      message: "קובץ זהה כבר הועלה",
+      similarWarning: null,
+      processing: false,
+    };
+  }
 
   // Save file
   const filePath = path.join(uploadsDir, fileName);
   await writeFile(filePath, buffer);
 
-  // Find category
-  let categoryId: string | null = null;
-  if (invoiceData.category) {
-    const category = await prisma.category.findFirst({ where: { name: invoiceData.category } });
-    categoryId = category?.id || null;
-  }
-
-  // Save invoice with file data in DB
+  // Save invoice without OCR data (will be filled later)
   const invoice = await prisma.invoice.create({
     data: {
       fileName,
       filePath,
-      fileData: buffer.length < 500000 ? buffer.toString("base64") : null, // Only store in DB if under 500KB
-      vendor: invoiceData.vendor,
-      amount: invoiceData.amount,
-      date: invoiceData.date,
+      fileHash,
+      fileData: buffer.length < 500000 ? buffer.toString("base64") : null,
       source: isImage ? "image-upload" : "pdf-upload",
       status: "pending",
-      creditCardLast4: invoiceData.creditCardLast4,
-      categoryId,
       userId,
     },
   });
@@ -64,12 +62,59 @@ async function processPage(
   return {
     id: invoice.id,
     fileName,
-    vendor: invoiceData.vendor,
-    amount: invoiceData.amount,
-    date: invoiceData.date?.toISOString() || null,
-    category: invoiceData.category,
-    creditCardLast4: invoiceData.creditCardLast4,
+    vendor: null,
+    amount: null,
+    date: null,
+    category: null,
+    creditCardLast4: null,
+    duplicate: false,
+    duplicateType: null,
+    message: null,
+    similarWarning: null,
+    processing: true, // OCR will happen in background
   };
+}
+
+// Phase 2: Process OCR in background (slow)
+async function processOCR(invoiceId: string, buffer: Buffer, isImage: boolean, userId: string) {
+  try {
+    const text = isImage ? await ocrFromImage(buffer) : await extractTextFromPdf(buffer);
+    const invoiceData = extractInvoiceData(text);
+
+    let categoryId: string | null = null;
+    if (invoiceData.category) {
+      const category = await prisma.category.findFirst({ where: { name: invoiceData.category } });
+      categoryId = category?.id || null;
+    }
+
+    // Check for similar invoice
+    let similarWarning: string | null = null;
+    if (invoiceData.vendor && invoiceData.amount && invoiceData.date) {
+      const similar = await prisma.invoice.findFirst({
+        where: {
+          userId,
+          vendor: invoiceData.vendor,
+          amount: invoiceData.amount,
+          date: invoiceData.date,
+          id: { not: invoiceId },
+        },
+      });
+      if (similar) similarWarning = "חשבונית דומה כבר קיימת";
+    }
+
+    await prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        vendor: invoiceData.vendor,
+        amount: invoiceData.amount,
+        date: invoiceData.date,
+        creditCardLast4: invoiceData.creditCardLast4,
+        categoryId,
+      },
+    });
+  } catch (e) {
+    console.error("OCR processing error:", e);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -83,10 +128,12 @@ export async function POST(request: NextRequest) {
 
     const { user, error } = await getAuthUser();
     if (error) return error;
+
     const uploadsDir = path.join(process.cwd(), "uploads", Date.now().toString());
     await mkdir(uploadsDir, { recursive: true });
 
     const results = [];
+    const ocrTasks: { invoiceId: string; buffer: Buffer; isImage: boolean }[] = [];
 
     for (const file of files) {
       const ext = path.extname(file.name).toLowerCase();
@@ -94,15 +141,12 @@ export async function POST(request: NextRequest) {
       const isImage = IMAGE_EXTENSIONS.includes(ext);
       const isPdf = ext === ".pdf";
 
-      if (!isImage && !isPdf) {
-        continue; // Skip unsupported files
-      }
+      if (!isImage && !isPdf) continue;
 
       if (isPdf) {
-        // Split PDF into pages, process each
         const pages = await splitPdfToPages(buffer);
         for (let i = 0; i < pages.length; i++) {
-          const result = await processPage(
+          const result = await saveInvoice(
             pages[i],
             `${path.basename(file.name, ext)}_page${i + 1}.pdf`,
             uploadsDir,
@@ -110,24 +154,39 @@ export async function POST(request: NextRequest) {
             false
           );
           results.push({ ...result, page: i + 1, sourceFile: file.name });
+          if (!result.duplicate && result.processing) {
+            ocrTasks.push({ invoiceId: result.id, buffer: pages[i], isImage: false });
+          }
         }
       } else {
-        // Single image = single invoice
-        const result = await processPage(
-          buffer,
-          file.name,
-          uploadsDir,
-          user.id,
-          true
-        );
+        const result = await saveInvoice(buffer, file.name, uploadsDir, user.id, true);
         results.push({ ...result, page: 1, sourceFile: file.name });
+        if (!result.duplicate && result.processing) {
+          ocrTasks.push({ invoiceId: result.id, buffer, isImage: true });
+        }
       }
     }
+
+    // Start OCR processing in background (don't await)
+    if (ocrTasks.length > 0) {
+      Promise.all(
+        ocrTasks.map((t) => processOCR(t.invoiceId, t.buffer, t.isImage, user.id))
+      ).catch(console.error);
+    }
+
+    const duplicates = results.filter((r) => r.duplicate).length;
 
     return NextResponse.json({
       success: true,
       totalInvoices: results.length,
+      duplicatesSkipped: duplicates,
       invoices: results,
+      ocrProcessing: ocrTasks.length > 0,
+      message: ocrTasks.length > 0
+        ? `${results.length - duplicates} חשבוניות נשמרו. OCR מעבד ברקע...`
+        : duplicates > 0
+          ? `${duplicates} חשבוניות כפולות דולגו`
+          : undefined,
     });
   } catch (error) {
     console.error("Upload error:", error);

@@ -68,6 +68,7 @@ model Invoice {
   filePath        String
   fileUrl         String?
   fileData        String?   @db.Text // base64 encoded file content
+  fileHash        String?   // SHA-256 hash for duplicate detection
   vendor          String?
   amount          Float?
   date            DateTime?
