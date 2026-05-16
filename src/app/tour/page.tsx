@@ -106,7 +106,7 @@ function DemoGmail() {
     <div className="space-y-3">
       <div className="flex items-center justify-between p-3 rounded-xl bg-card border border-border">
         <div className="space-y-0.5">
-          <p className="text-sm font-medium">edishteinberg10@gmail.com</p>
+          <p className="text-sm font-medium">user@example.com</p>
           <p className="text-[11px] text-muted-foreground">סנכרון אחרון: 15.5.2026</p>
         </div>
         <div className="flex gap-1">

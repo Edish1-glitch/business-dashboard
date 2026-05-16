@@ -159,6 +159,54 @@ export interface EmailAttachment {
 }
 
 /**
+ * Filter out files that are clearly NOT invoices based on filename patterns.
+ * Returns true if the file should be SKIPPED (not an invoice).
+ */
+function shouldSkipFile(fileName: string): boolean {
+  const lower = fileName.toLowerCase();
+
+  // Skip known non-invoice file patterns
+  const skipPatterns = [
+    // Documents / legal
+    /תנאי.*(שימוש|הצטרפות|שירות)/,
+    /הסכם.*(הלוואה|שירות)/,
+    /מדיניות.*פרטיות/,
+    /נספח/,
+    /טופס.?101/,
+    /consolidationagreement/i,
+    /accepted.?terms/i,
+    /policy.*card/i,
+    // Insurance docs (not invoices)
+    /passportcard.?policy/i,
+    /פוליסה/,
+    /ביטוח.*(מקיף|חובה)/,
+    /כיסויים/,
+    /שירותי.?דרך/,
+    // Travel docs
+    /boardingpass/i,
+    /itinerary/i,
+    /lkpass/i,
+    // Images that are usually logos/icons/signatures
+    /^(icon|logo|signature|image001|checkedgray|check_2|attention|wifi_g|companylogo)/i,
+    /admailbnr/i,
+    // Bank tips
+    /טיפ.?מספר/,
+    // Reports (not invoices)
+    /income\.\d+\.\d+/i,
+    // Psycho profiles, medical letters
+    /פסיכו/,
+    /שחרור/,
+    // Licenses
+    /driverlicense/i,
+    /carlicense/i,
+    // QR codes
+    /^qr(reservation|ticket|voucher)/i,
+  ];
+
+  return skipPatterns.some((p) => p.test(lower) || p.test(fileName));
+}
+
+/**
  * Get PDF/image attachments from a specific email message.
  * Skips inline images and files over the R2 size limit.
  */
@@ -196,6 +244,9 @@ export async function getAttachments(
           (h) => h.name?.toLowerCase() === "content-disposition"
         )?.value;
         if (disposition && disposition.startsWith("inline")) continue;
+
+        // Skip files that are clearly not invoices
+        if (shouldSkipFile(part.filename)) continue;
 
         attachments.push({
           fileName: part.filename,
