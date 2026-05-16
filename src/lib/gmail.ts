@@ -161,50 +161,110 @@ export interface EmailAttachment {
 /**
  * Filter out files that are clearly NOT invoices based on filename patterns.
  * Returns true if the file should be SKIPPED (not an invoice).
+ *
+ * Sources for patterns:
+ * - Israeli invoice requirements: must contain "חשבונית מס" or "עוסק מורשה"
+ * - Common email signature/logo filenames from corporate email systems
+ * - Legal/insurance document patterns from Israeli businesses
  */
 function shouldSkipFile(fileName: string): boolean {
   const lower = fileName.toLowerCase();
 
-  // Skip known non-invoice file patterns
   const skipPatterns = [
-    // Documents / legal
-    /תנאי.*(שימוש|הצטרפות|שירות)/,
-    /הסכם.*(הלוואה|שירות)/,
+    // ===== Legal / Terms / Agreements (Hebrew) =====
+    /תנאי.*(שימוש|הצטרפות|שירות|תובלה)/,
+    /הסכם.*(הלוואה|שירות|הצטרפות)/,
     /מדיניות.*פרטיות/,
     /נספח/,
     /טופס.?101/,
+    /פרק\s+[א-ת]/,  // פרק א, פרק ב, etc.
+
+    // ===== Legal / Terms (English) =====
+    /terms.?(of.?service|and.?conditions|of.?use)/i,
+    /privacy.?policy/i,
     /consolidationagreement/i,
     /accepted.?terms/i,
-    /policy.*card/i,
-    // Insurance docs (not invoices)
+    /end.?user.?license/i,
+    /eula/i,
+
+    // ===== Insurance / Policies =====
     /passportcard.?policy/i,
+    /policy.?details/i,
     /פוליסה/,
     /ביטוח.*(מקיף|חובה)/,
     /כיסויים/,
     /שירותי.?דרך/,
-    // Travel docs
+    /כתב.?שירות/,
+    /רשימה.?לביטוח/,
+    /דף.?פרטי.*(ביטוח|הביטוח)/,
+
+    // ===== Travel / Boarding =====
     /boardingpass/i,
+    /boarding.?card/i,
     /itinerary/i,
+    /e.?ticket/i,
     /lkpass/i,
-    // Images that are usually logos/icons/signatures
-    /^(icon|logo|signature|image001|checkedgray|check_2|attention|wifi_g|companylogo)/i,
+    /כרטיס.?עלייה/,
+
+    // ===== Email signature images / logos / icons =====
+    /^(icon|logo|signature|banner|image00\d|spacer|pixel|tracking)/i,
+    /^(checkedgray|check_2|attention|wifi_g|companylogo|headerimg)/i,
     /admailbnr/i,
-    // Bank tips
+    /email.?signature/i,
+    /^(facebook|twitter|linkedin|instagram|youtube|social)/i,
+    /\blogo\b.*\.(png|jpg|gif)/i,
+
+    // ===== Bank / Financial tips =====
     /טיפ.?מספר/,
-    // Reports (not invoices)
-    /income\.\d+\.\d+/i,
-    // Psycho profiles, medical letters
+
+    // ===== Income reports (not invoices) =====
+    /^income\.\d+/i,
+
+    // ===== Medical / Personal =====
     /פסיכו/,
-    /שחרור/,
-    // Licenses
+    /מכתב.?שחרור/,
+    /תמונת.?פסיכו/,
+    /סיכום.?טיפול/,
+
+    // ===== Licenses / IDs =====
     /driverlicense/i,
     /carlicense/i,
-    // QR codes
-    /^qr(reservation|ticket|voucher)/i,
+    /driver.?license/i,
+    /car.?license/i,
+
+    // ===== QR codes =====
+    /^qr(reservation|ticket|voucher|code)/i,
+
+    // ===== Newsletter / Marketing =====
+    /newsletter/i,
+    /unsubscribe/i,
+    /campaign/i,
+    /promotional/i,
+    /^(header|footer|masthead)/i,
+
+    // ===== Vouchers / Coupons =====
+    /voucher/i,
+    /coupon/i,
+    /gift.?card/i,
+
+    // ===== Government forms =====
+    /בל\/?\s?\d{4}/,  // ביטוח לאומי forms
+    /T2201/i,
+
+    // ===== Shipping labels =====
+    /shipping.?label/i,
+    /waybill/i,
+    /tracking.?number/i,
   ];
 
   return skipPatterns.some((p) => p.test(lower) || p.test(fileName));
 }
+
+/**
+ * Minimum file size to consider as an invoice.
+ * Very small files (<5KB) are usually logos, icons, or tracking pixels.
+ */
+const MIN_INVOICE_FILE_SIZE = 5 * 1024; // 5KB
 
 /**
  * Get PDF/image attachments from a specific email message.
@@ -276,6 +336,9 @@ export async function getAttachments(
 
     // Skip files likely over 5MB (base64 size is ~33% larger than actual)
     if (meta._estimatedSize && meta._estimatedSize > R2_LIMITS.MAX_FILE_SIZE * 1.4) continue;
+
+    // Skip very small files (logos, icons, tracking pixels)
+    if (meta._estimatedSize && meta._estimatedSize < MIN_INVOICE_FILE_SIZE) continue;
 
     try {
       const attachmentData = await gmail.users.messages.attachments.get({
