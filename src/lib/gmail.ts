@@ -374,6 +374,29 @@ function shouldSkipFile(fileName: string): boolean {
     /shipping.?label/i,
     /waybill/i,
     /tracking.?number/i,
+
+    // ===== Non-invoice file types (by extension) =====
+    /\.(docx?|xlsx?|pptx?|csv|zip|rar|7z|mp3|mp4|mov|avi|wav)$/i,
+    /\.(html?|xml|json|txt|md|log)$/i,
+    /\.(exe|dmg|pkg|msi|apk|ipa)$/i,
+    /\.(ai|psd|sketch|fig|svg|eps|tiff?)$/i,
+
+    // ===== Bank statements / reports =====
+    /דוח.?תנועות/,
+    /bank.?statement/i,
+    /account.?statement/i,
+    /תדפיס.?חשבון/,
+    /OTEK/i,
+
+    // ===== Payslips =====
+    /תלוש.?שכר/,
+    /payslip/i,
+    /pay.?stub/i,
+    /salary.?slip/i,
+
+    // ===== Trading / Evidence =====
+    /trade.?history/i,
+    /evidence_/i,
   ];
 
   return skipPatterns.some((p) => p.test(lower) || p.test(fileName));
