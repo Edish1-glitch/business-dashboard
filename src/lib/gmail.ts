@@ -106,8 +106,10 @@ export async function getGmailClient(
 }
 
 /**
- * Search Gmail for emails with PDF/image attachments in a date range.
- * Returns all matching message IDs (no pagination cap).
+ * Search Gmail for invoice-related emails in a date range.
+ * Two strategies:
+ * 1. Emails with PDF/image attachments (original)
+ * 2. Emails with invoice keywords in subject (catches inline HTML invoices)
  */
 export async function searchEmails(
   gmail: gmail_v1.Gmail,
@@ -115,38 +117,44 @@ export async function searchEmails(
   beforeDate?: Date | null
 ): Promise<string[]> {
   const afterStr = `${afterDate.getFullYear()}/${String(afterDate.getMonth() + 1).padStart(2, "0")}/${String(afterDate.getDate()).padStart(2, "0")}`;
-  let query = `has:attachment (filename:pdf OR filename:jpg OR filename:jpeg OR filename:png) after:${afterStr}`;
+  let dateFilter = `after:${afterStr}`;
   if (beforeDate) {
     const beforeStr = `${beforeDate.getFullYear()}/${String(beforeDate.getMonth() + 1).padStart(2, "0")}/${String(beforeDate.getDate()).padStart(2, "0")}`;
-    query += ` before:${beforeStr}`;
+    dateFilter += ` before:${beforeStr}`;
   }
 
-  const messageIds: string[] = [];
-  let pageToken: string | undefined;
+  // Strategy 1: Attachments (PDF/images) - but filter by invoice-related subjects
+  const attachmentQuery = `has:attachment (filename:pdf OR filename:jpg OR filename:jpeg OR filename:png) ${dateFilter} -subject:(newsletter OR עדכון OR הודעה OR "terms of service" OR שינוי OR עלון OR ברכות)`;
 
-  do {
-    const res = await gmail.users.messages.list({
-      userId: "me",
-      q: query,
-      maxResults: 100,
-      pageToken,
-    });
+  // Strategy 2: Invoice keywords in subject (catches inline HTML invoices from PayPal, Uber, etc.)
+  const subjectQuery = `subject:(חשבונית OR קבלה OR receipt OR invoice OR "tax invoice" OR "order confirmation" OR הזמנה OR תשלום OR payment OR billing) ${dateFilter} -subject:(newsletter OR spam)`;
 
-    if (res.data.messages) {
-      for (const msg of res.data.messages) {
-        if (msg.id) messageIds.push(msg.id);
+  const allIds = new Set<string>();
+
+  // Run both queries
+  for (const query of [attachmentQuery, subjectQuery]) {
+    let pageToken: string | undefined;
+
+    do {
+      const res = await gmail.users.messages.list({
+        userId: "me",
+        q: query,
+        maxResults: 100,
+        pageToken,
+      });
+
+      if (res.data.messages) {
+        for (const msg of res.data.messages) {
+          if (msg.id) allIds.add(msg.id);
+        }
       }
-    }
 
-    pageToken = res.data.nextPageToken || undefined;
+      pageToken = res.data.nextPageToken || undefined;
+      if (pageToken) await new Promise((r) => setTimeout(r, 100));
+    } while (pageToken);
+  }
 
-    // Small delay to respect rate limits
-    if (pageToken) {
-      await new Promise((r) => setTimeout(r, 100));
-    }
-  } while (pageToken);
-
-  return messageIds;
+  return [...allIds];
 }
 
 export interface EmailAttachment {
@@ -156,6 +164,117 @@ export interface EmailAttachment {
   messageDate: Date | null;
   subject: string;
   from: string;
+}
+
+/**
+ * Extract inline invoice data from email HTML body.
+ * Catches invoices from PayPal, Uber, Wolt, Google, AWS, Stripe etc.
+ * that are embedded in the email and not attached as PDF.
+ */
+export interface InlineInvoice {
+  subject: string;
+  from: string;
+  date: Date | null;
+  htmlBody: string;
+  textBody: string;
+}
+
+export async function getInlineInvoice(
+  gmail: gmail_v1.Gmail,
+  messageId: string
+): Promise<InlineInvoice | null> {
+  const msg = await gmail.users.messages.get({
+    userId: "me",
+    id: messageId,
+    format: "full",
+  });
+
+  const headers = msg.data.payload?.headers || [];
+  const subject = headers.find((h) => h.name?.toLowerCase() === "subject")?.value || "";
+  const from = headers.find((h) => h.name?.toLowerCase() === "from")?.value || "";
+  const dateHeader = headers.find((h) => h.name?.toLowerCase() === "date")?.value;
+  const date = dateHeader ? new Date(dateHeader) : null;
+
+  // Check if this email has PDF attachments - if so, skip inline extraction
+  // (the attachment handler already processes these)
+  let hasInvoiceAttachment = false;
+  function checkForAttachments(parts: gmail_v1.Schema$MessagePart[] | undefined) {
+    if (!parts) return;
+    for (const part of parts) {
+      if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
+        const lower = part.filename.toLowerCase();
+        if (lower.endsWith(".pdf") && !shouldSkipFile(part.filename)) {
+          hasInvoiceAttachment = true;
+        }
+      }
+      if (part.parts) checkForAttachments(part.parts);
+    }
+  }
+  checkForAttachments(msg.data.payload?.parts);
+  if (hasInvoiceAttachment) return null; // Already handled by attachment processing
+
+  // Extract HTML and text body
+  let htmlBody = "";
+  let textBody = "";
+
+  function extractBody(parts: gmail_v1.Schema$MessagePart[] | undefined) {
+    if (!parts) return;
+    for (const part of parts) {
+      if (part.mimeType === "text/html" && part.body?.data) {
+        htmlBody += Buffer.from(part.body.data, "base64url").toString("utf-8");
+      }
+      if (part.mimeType === "text/plain" && part.body?.data) {
+        textBody += Buffer.from(part.body.data, "base64url").toString("utf-8");
+      }
+      if (part.parts) extractBody(part.parts);
+    }
+  }
+
+  // Handle single-part messages
+  if (msg.data.payload?.mimeType === "text/html" && msg.data.payload?.body?.data) {
+    htmlBody = Buffer.from(msg.data.payload.body.data, "base64url").toString("utf-8");
+  } else if (msg.data.payload?.mimeType === "text/plain" && msg.data.payload?.body?.data) {
+    textBody = Buffer.from(msg.data.payload.body.data, "base64url").toString("utf-8");
+  } else {
+    extractBody(msg.data.payload?.parts);
+  }
+
+  if (!htmlBody && !textBody) return null;
+
+  // Check if the email body looks like it contains invoice/receipt data
+  const bodyToCheck = (htmlBody + textBody).toLowerCase();
+  const invoiceKeywords = [
+    "total", "amount", "סה\"כ", "סכום", "לתשלום", "מע\"מ", "vat", "tax",
+    "invoice", "receipt", "חשבונית", "קבלה", "order", "הזמנה",
+    "payment", "תשלום", "charged", "חויב", "billing",
+    "$", "₪", "€", "£", "usd", "ils",
+  ];
+
+  const matchCount = invoiceKeywords.filter((kw) => bodyToCheck.includes(kw)).length;
+  if (matchCount < 3) return null; // Need at least 3 invoice keywords
+
+  return { subject, from, date, htmlBody, textBody };
+}
+
+/**
+ * Strip HTML tags and extract plain text for OCR/categorization.
+ */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?(p|div|tr|li|h[1-6])[^>]*>/gi, "\n")
+    .replace(/<\/?(td|th)[^>]*>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#?\w+;/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**

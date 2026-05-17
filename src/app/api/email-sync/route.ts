@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/api-auth";
-import { getGmailClient, searchEmails, getAttachments } from "@/lib/gmail";
+import { getGmailClient, searchEmails, getAttachments, getInlineInvoice, htmlToText } from "@/lib/gmail";
 import { processAndSave, splitPdfToPageBuffers } from "@/lib/invoice-processor";
+import { extractInvoiceData } from "@/lib/pdf/categorize";
 import { R2_LIMITS } from "@/lib/r2";
 
 // R2 free tier: 10GB. Stop at 8GB to leave buffer.
@@ -180,54 +181,97 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
 
           processedMessages++;
 
-          let attachments;
+          // Strategy 1: Process file attachments
+          let attachments: Awaited<ReturnType<typeof getAttachments>> = [];
           try {
             attachments = await getAttachments(gmail, msgId);
           } catch {
-            continue; // skip failed messages
+            attachments = [];
           }
 
-          if (attachments.length === 0) continue;
+          let msgDate: Date | null = null;
 
-          // Track the date of this message for lastSyncAt
-          const msgDate = attachments[0]?.messageDate;
-          if (msgDate && (!lastProcessedDate || msgDate > lastProcessedDate)) {
-            lastProcessedDate = msgDate;
-          }
+          if (attachments.length > 0) {
+            msgDate = attachments[0]?.messageDate;
 
-          for (const att of attachments) {
-            if (stoppedEarly) break;
+            for (const att of attachments) {
+              if (stoppedEarly) break;
+              if (storageUsed + totalStorageAdded + att.buffer.length >= MAX_STORAGE_BYTES) {
+                stoppedEarly = true;
+                break;
+              }
 
-            // Check storage before each file
-            if (storageUsed + totalStorageAdded + att.buffer.length >= MAX_STORAGE_BYTES) {
-              stoppedEarly = true;
-              break;
-            }
-
-            try {
-              // Split PDFs into pages (like upload does)
-              const pages = await splitPdfToPageBuffers(att.buffer, att.fileName);
-
-              for (const page of pages) {
-                if (storageUsed + totalStorageAdded + page.buffer.length >= MAX_STORAGE_BYTES) {
-                  stoppedEarly = true;
-                  break;
+              try {
+                const pages = await splitPdfToPageBuffers(att.buffer, att.fileName);
+                for (const page of pages) {
+                  if (storageUsed + totalStorageAdded + page.buffer.length >= MAX_STORAGE_BYTES) {
+                    stoppedEarly = true;
+                    break;
+                  }
+                  const result = await processAndSave(page.buffer, page.fileName, userId, page.isImage, "email");
+                  if (result.duplicate) totalDuplicates++;
+                  else if (result.id) { totalInvoicesFound++; totalStorageAdded += page.buffer.length; }
                 }
+              } catch { /* skip failed */ }
+            }
+          }
 
-                const result = await processAndSave(
-                  page.buffer, page.fileName, userId, page.isImage, "email"
-                );
+          // Strategy 2: Extract inline invoice from email HTML body
+          if (attachments.length === 0) {
+            try {
+              const inline = await getInlineInvoice(gmail, msgId);
+              if (inline) {
+                msgDate = inline.date;
+                const text = inline.textBody || htmlToText(inline.htmlBody);
+                const invoiceData = extractInvoiceData(text);
 
-                if (result.duplicate) {
-                  totalDuplicates++;
-                } else if (result.id) {
-                  totalInvoicesFound++;
-                  totalStorageAdded += page.buffer.length;
+                // Only save if we found meaningful data (at least vendor or amount)
+                if (invoiceData.vendor || invoiceData.amount) {
+                  // Create a text-based "file" to save
+                  const content = `Subject: ${inline.subject}\nFrom: ${inline.from}\nDate: ${inline.date?.toISOString() || ""}\n\n${text}`;
+                  const buffer = Buffer.from(content, "utf-8");
+
+                  // Check for duplicate by content hash
+                  const { createHash } = await import("crypto");
+                  const hash = createHash("sha256").update(buffer).digest("hex");
+                  const existing = await prisma.invoice.findFirst({ where: { fileHash: hash, userId } });
+
+                  if (!existing) {
+                    let categoryId: string | null = null;
+                    if (invoiceData.category) {
+                      const cat = await prisma.category.findFirst({ where: { name: invoiceData.category } });
+                      categoryId = cat?.id || null;
+                    }
+
+                    await prisma.invoice.create({
+                      data: {
+                        fileName: `email-${inline.subject.slice(0, 50)}.txt`,
+                        filePath: "inline",
+                        fileHash: hash,
+                        fileData: buffer.toString("base64"),
+                        vendor: invoiceData.vendor,
+                        amount: invoiceData.amount,
+                        currency: invoiceData.currency || "ILS",
+                        date: invoiceData.date || inline.date,
+                        source: "email",
+                        status: "pending",
+                        creditCardLast4: invoiceData.creditCardLast4,
+                        categoryId,
+                        userId,
+                      },
+                    });
+                    totalInvoicesFound++;
+                  } else {
+                    totalDuplicates++;
+                  }
                 }
               }
-            } catch {
-              // Skip failed attachments
-            }
+            } catch { /* skip failed inline extraction */ }
+          }
+
+          // Track date
+          if (msgDate && (!lastProcessedDate || msgDate > lastProcessedDate)) {
+            lastProcessedDate = msgDate;
           }
 
           // Progress update every message
