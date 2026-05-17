@@ -222,7 +222,7 @@ export default function PendingInvoicesPage() {
             placeholder="חיפוש לפי ספק, קובץ או קטגוריה..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-8 rounded-lg border border-input bg-background pr-8 pl-3 text-xs"
+            className="w-full h-9 rounded-lg border border-input bg-background pr-8 pl-3 text-[16px] sm:text-xs"
           />
         </div>
         <div className="flex gap-1">
@@ -304,28 +304,28 @@ export default function PendingInvoicesPage() {
                   <div className="md:w-1/2 bg-white border-b md:border-b-0 md:border-r border-border overflow-auto max-h-[500px]">
                     <img src={`/api/invoices/${inv.id}/preview`} alt="preview" className="w-full" draggable={false} />
                   </div>
-                  <div className="md:w-1/2 p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-2.5">
+                  <div className="md:w-1/2 p-3 sm:p-4 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
                         <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">ספק</label>
-                        <input type="text" value={editData.vendor || ""} onChange={(e) => setEditData({ ...editData, vendor: e.target.value })} className="w-full h-8 rounded-lg border border-input bg-background px-2.5 text-sm" />
+                        <input type="text" value={editData.vendor || ""} onChange={(e) => setEditData({ ...editData, vendor: e.target.value })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
                       </div>
                       <div>
                         <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">סכום (₪)</label>
-                        <input type="number" step="0.01" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })} className="w-full h-8 rounded-lg border border-input bg-background px-2.5 text-sm" />
+                        <input type="number" step="0.01" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
                       </div>
                       <div>
                         <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">תאריך</label>
-                        <input type="date" value={typeof editData.date === "string" ? editData.date : ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className="w-full h-8 rounded-lg border border-input bg-background px-2.5 text-sm" />
+                        <input type="date" value={typeof editData.date === "string" ? editData.date : ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
                       </div>
                       <div>
                         <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">4 ספרות כרטיס</label>
-                        <input type="text" maxLength={4} value={editData.creditCardLast4 || ""} onChange={(e) => setEditData({ ...editData, creditCardLast4: e.target.value.replace(/\D/g, "") })} className="w-full h-8 rounded-lg border border-input bg-background px-2.5 text-sm" placeholder="1234" />
+                        <input type="text" maxLength={4} value={editData.creditCardLast4 || ""} onChange={(e) => setEditData({ ...editData, creditCardLast4: e.target.value.replace(/\D/g, "") })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" placeholder="1234" />
                       </div>
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">קטגוריה</label>
                         <div className="flex gap-1.5">
-                          <select value={editData.category?.id || ""} onChange={(e) => { const cat = categories.find((c) => c.id === e.target.value); setEditData({ ...editData, category: cat || null }); }} className="flex-1 h-8 rounded-lg border border-input bg-background px-2.5 text-sm">
+                          <select value={editData.category?.id || ""} onChange={(e) => { const cat = categories.find((c) => c.id === e.target.value); setEditData({ ...editData, category: cat || null }); }} className="flex-1 h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm">
                             <option value="">ללא קטגוריה</option>
                             {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                           </select>
@@ -333,7 +333,7 @@ export default function PendingInvoicesPage() {
                         </div>
                         {showNewCategory && (
                           <div className="flex gap-1.5 mt-1.5">
-                            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="שם קטגוריה חדשה" className="flex-1 h-8 rounded-lg border border-input bg-background px-2.5 text-sm" />
+                            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="שם קטגוריה חדשה" className="flex-1 h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
                             <Button size="sm" className="h-8" onClick={addCategory} disabled={addingCategory}>{addingCategory ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "הוסף"}</Button>
                           </div>
                         )}
