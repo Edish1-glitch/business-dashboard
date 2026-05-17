@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { Tag, User, Plus, Loader2, X, Play, Mail, RefreshCw, Trash2, Calendar, AlertTriangle, Clock } from "lucide-react";
+import { Tag, User, Plus, Loader2, X, Play, Mail, RefreshCw, Trash2, Calendar, AlertTriangle, Clock, ChevronDown } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useSyncContext } from "@/components/providers/SyncProvider";
@@ -291,22 +291,25 @@ function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Sync history */}
+                {/* Sync history - dropdown */}
                 {account.syncRanges && account.syncRanges.length > 0 && (
-                  <div className="mr-3 space-y-1">
-                    <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                  <details className="mr-3">
+                    <summary className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 cursor-pointer select-none list-none">
                       <Clock className="h-3 w-3" />
-                      היסטוריית סנכרונים
-                    </p>
-                    {account.syncRanges.map((range, i) => (
-                      <div key={i} className="text-[11px] text-muted-foreground flex items-center gap-2">
-                        <span>
-                          {new Date(range.fromDate).toLocaleDateString("he-IL")} - {new Date(range.toDate).toLocaleDateString("he-IL")}
-                        </span>
-                        <span className="text-xs font-medium">{range.invoicesFound} חשבוניות</span>
-                      </div>
-                    ))}
-                  </div>
+                      היסטוריית סנכרונים ({account.syncRanges.length})
+                      <ChevronDown className="h-3 w-3 transition-transform [details[open]>&]:rotate-180" />
+                    </summary>
+                    <div className="mt-1 space-y-0.5 pr-4">
+                      {account.syncRanges.map((range, i) => (
+                        <div key={i} className="text-[11px] text-muted-foreground flex items-center gap-2">
+                          <span>
+                            {new Date(range.fromDate).toLocaleDateString("he-IL")} - {new Date(range.toDate).toLocaleDateString("he-IL")}
+                          </span>
+                          <span className="text-xs font-medium">{range.invoicesFound} חשבוניות</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 )}
               </div>
             ))}
