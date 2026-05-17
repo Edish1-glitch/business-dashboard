@@ -194,33 +194,38 @@ export default function DashboardPage() {
           {/* Charts */}
           <div data-tour="charts" className="grid gap-4 md:grid-cols-2">
             {/* Pie chart */}
-            <div className="rounded-2xl bg-card border border-border/50 p-5 shadow-sm">
-              <h3 className="text-base font-semibold mb-4">הוצאות לפי קטגוריה</h3>
+            <div className="rounded-2xl bg-card border border-border/50 p-4 sm:p-5 shadow-sm outline-none" style={{ WebkitTapHighlightColor: "transparent" }}>
+              <h3 className="text-base font-semibold mb-3">הוצאות לפי קטגוריה</h3>
               {data && data.byCategory.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={data.byCategory}
-                      dataKey="amount"
-                      nameKey="name"
-                      cx="50%"
-                      cy="45%"
-                      outerRadius={80}
-                      innerRadius={45}
-                      paddingAngle={2}
-                    >
-                      {data.byCategory.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => `₪${Number(value).toLocaleString("he-IL")}`} />
-                    <Legend
-                      verticalAlign="bottom"
-                      height={50}
-                      formatter={(value) => <span className="text-xs">{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="outline-none select-none" style={{ WebkitTapHighlightColor: "transparent" }}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={data.byCategory}
+                        dataKey="amount"
+                        nameKey="name"
+                        cx="50%"
+                        cy="42%"
+                        outerRadius="70%"
+                        innerRadius="40%"
+                        paddingAngle={2}
+                      >
+                        {data.byCategory.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => `₪${Number(value).toLocaleString("he-IL")}`}
+                        contentStyle={{ fontSize: 12, borderRadius: 8, padding: "4px 8px" }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={40}
+                        formatter={(value) => <span className="text-[11px] sm:text-xs">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
                   אין נתונים להצגה
@@ -229,18 +234,23 @@ export default function DashboardPage() {
             </div>
 
             {/* Bar chart */}
-            <div className="rounded-2xl bg-card border border-border/50 p-5 shadow-sm">
-              <h3 className="text-base font-semibold mb-4">הוצאות חודשיות</h3>
+            <div className="rounded-2xl bg-card border border-border/50 p-4 sm:p-5 shadow-sm outline-none" style={{ WebkitTapHighlightColor: "transparent" }}>
+              <h3 className="text-base font-semibold mb-3">הוצאות חודשיות</h3>
               {data && data.monthlyData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={data.monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="month" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <Tooltip formatter={(value) => `₪${Number(value).toLocaleString("he-IL")}`} />
-                    <Bar dataKey="amount" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="outline-none select-none" style={{ WebkitTapHighlightColor: "transparent" }}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={data.monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="month" fontSize={11} />
+                      <YAxis fontSize={11} width={40} />
+                      <Tooltip
+                        formatter={(value) => `₪${Number(value).toLocaleString("he-IL")}`}
+                        contentStyle={{ fontSize: 12, borderRadius: 8, padding: "4px 8px" }}
+                      />
+                      <Bar dataKey="amount" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
                   אין נתונים להצגה
