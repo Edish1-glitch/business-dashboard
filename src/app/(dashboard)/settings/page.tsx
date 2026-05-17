@@ -49,7 +49,7 @@ function SettingsPage() {
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
   const [loadingEmails, setLoadingEmails] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [syncFromDate, setSyncFromDate] = useState("2024-01-01");
+  const [syncFromDate, setSyncFromDate] = useState(new Date().getFullYear() + "-01-01");
   const [syncToDate, setSyncToDate] = useState(new Date().toISOString().split("T")[0]);
   const [showOverlapWarning, setShowOverlapWarning] = useState(false);
   const [overlapMessage, setOverlapMessage] = useState("");
@@ -344,8 +344,30 @@ function SettingsPage() {
                 </Button>
               </div>
 
+              {/* Inline progress (only on settings page) */}
+              {syncState.isSyncing && (
+                <div className="space-y-2 rounded-xl bg-muted/30 border border-border/30 p-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{syncState.progress}</span>
+                    {syncState.percent > 0 && (
+                      <span className="font-medium">{Math.round(syncState.percent)}%</span>
+                    )}
+                  </div>
+                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${Math.max(syncState.percent, 2)}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Sync result */}
+              {!syncState.isSyncing && syncState.result && (
+                <div className="rounded-xl bg-muted/50 p-3 text-sm whitespace-pre-line">
+                  {syncState.result}
+                </div>
+              )}
+
               <p className="text-[11px] text-muted-foreground">
-                הסנכרון רץ ברקע - ניתן לנווט לדפים אחרים וה-progress יופיע בחלון צף.
+                ניתן לנווט לדפים אחרים בזמן הסנכרון - ה-progress יופיע בחלון צף.
               </p>
             </div>
           </div>

@@ -41,6 +41,16 @@ export async function GET(
   try {
     const fileBuffer = await getFileBuffer(invoice);
 
+    // Inline HTML email - return as HTML for iframe rendering
+    if (invoice.filePath === "inline-html" || invoice.fileName.endsWith(".html")) {
+      return new NextResponse(new Uint8Array(fileBuffer), {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
+
     // If it's an image, return directly
     const isImage = invoice.fileName.match(/\.(jpg|jpeg|png|webp)$/i);
     if (isImage) {

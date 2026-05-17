@@ -227,9 +227,9 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
 
                 // Only save if we found meaningful data (at least vendor or amount)
                 if (invoiceData.vendor || invoiceData.amount) {
-                  // Create a text-based "file" to save
-                  const content = `Subject: ${inline.subject}\nFrom: ${inline.from}\nDate: ${inline.date?.toISOString() || ""}\n\n${text}`;
-                  const buffer = Buffer.from(content, "utf-8");
+                  // Save HTML for preview, text for OCR data
+                  const htmlContent = inline.htmlBody || `<pre>${text}</pre>`;
+                  const buffer = Buffer.from(htmlContent, "utf-8");
 
                   // Check for duplicate by content hash
                   const { createHash } = await import("crypto");
@@ -245,8 +245,8 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
 
                     await prisma.invoice.create({
                       data: {
-                        fileName: `email-${inline.subject.slice(0, 50)}.txt`,
-                        filePath: "inline",
+                        fileName: `email-${inline.subject.slice(0, 50)}.html`,
+                        filePath: "inline-html",
                         fileHash: hash,
                         fileData: buffer.toString("base64"),
                         vendor: invoiceData.vendor,

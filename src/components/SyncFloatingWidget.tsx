@@ -1,15 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { useSyncContext } from "@/components/providers/SyncProvider";
 import { RefreshCw, X, ChevronUp, ChevronDown, Mail, CheckCircle2 } from "lucide-react";
 
 export function SyncFloatingWidget() {
   const { syncState, dismissResult } = useSyncContext();
   const [minimized, setMinimized] = useState(false);
+  const pathname = usePathname();
 
   // Don't render if nothing happening
   if (!syncState.isSyncing && !syncState.result) return null;
+
+  // Don't render on settings page - it has its own inline progress
+  if (pathname === "/settings") return null;
 
   return (
     <div className="fixed bottom-4 left-4 z-50 max-w-sm w-80 animate-in slide-in-from-bottom-4">

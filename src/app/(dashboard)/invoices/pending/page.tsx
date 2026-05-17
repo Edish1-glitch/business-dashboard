@@ -273,17 +273,32 @@ export default function PendingInvoicesPage() {
       </div>
 
       {/* Preview modal */}
-      {previewId && (
-        <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4" onClick={() => setPreviewId(null)}>
-          <div className="bg-white rounded-2xl overflow-auto max-w-2xl max-h-[85vh] w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 z-10 flex items-center justify-between p-3 bg-white border-b">
-              <span className="text-sm font-medium text-gray-700">תצוגה מקדימה</span>
-              <button onClick={() => setPreviewId(null)} className="p-1 rounded-lg hover:bg-gray-100"><X className="h-5 w-5 text-gray-500" /></button>
+      {previewId && (() => {
+        const previewInv = filteredInvoices.find((i) => i.id === previewId);
+        const isHtml = previewInv?.fileName.endsWith(".html");
+        return (
+          <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4" onClick={() => setPreviewId(null)}>
+            <div className="bg-white rounded-2xl overflow-hidden max-w-2xl max-h-[85vh] w-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-3 bg-white border-b shrink-0">
+                <span className="text-sm font-medium text-gray-700">תצוגה מקדימה</span>
+                <button onClick={() => setPreviewId(null)} className="p-1 rounded-lg hover:bg-gray-100"><X className="h-5 w-5 text-gray-500" /></button>
+              </div>
+              {isHtml ? (
+                <iframe
+                  src={`/api/invoices/${previewId}/preview`}
+                  className="w-full flex-1 min-h-[60vh]"
+                  sandbox="allow-same-origin"
+                  title="preview"
+                />
+              ) : (
+                <div className="overflow-auto flex-1">
+                  <img src={`/api/invoices/${previewId}/preview`} alt="preview" className="w-full" />
+                </div>
+              )}
             </div>
-            <img src={`/api/invoices/${previewId}/preview`} alt="preview" className="w-full" />
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Invoice cards */}
       <div className="grid gap-2">
@@ -302,7 +317,11 @@ export default function PendingInvoicesPage() {
                 /* ===== EDIT MODE ===== */
                 <div className="flex flex-col md:flex-row-reverse">
                   <div className="md:w-1/2 bg-white border-b md:border-b-0 md:border-r border-border overflow-auto max-h-[500px]">
-                    <img src={`/api/invoices/${inv.id}/preview`} alt="preview" className="w-full" draggable={false} />
+                    {inv.fileName.endsWith(".html") ? (
+                      <iframe src={`/api/invoices/${inv.id}/preview`} className="w-full h-[400px]" sandbox="allow-same-origin" title="preview" />
+                    ) : (
+                      <img src={`/api/invoices/${inv.id}/preview`} alt="preview" className="w-full" draggable={false} />
+                    )}
                   </div>
                   <div className="md:w-1/2 p-3 sm:p-4 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
