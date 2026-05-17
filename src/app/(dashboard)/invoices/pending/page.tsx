@@ -20,6 +20,7 @@ import {
   ArrowUpDown,
   Clock,
   Receipt,
+  Mail,
   TrendingDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -377,9 +378,13 @@ export default function PendingInvoicesPage() {
                       {isSelected ? <CheckSquare className="h-[18px] w-[18px] text-primary" /> : <Square className="h-[18px] w-[18px]" />}
                     </button>
 
-                    {/* 4. Thumbnail */}
-                    <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-border overflow-hidden bg-white hover:ring-2 hover:ring-primary/30 transition-all">
-                      <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />
+                    {/* 4. Thumbnail or mail icon */}
+                    <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-border overflow-hidden bg-white hover:ring-2 hover:ring-primary/30 transition-all flex items-center justify-center">
+                      {inv.fileName.endsWith(".html") ? (
+                        <Mail className="h-5 w-5 text-muted-foreground/40" />
+                      ) : (
+                        <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />
+                      )}
                     </button>
 
                     {/* Content */}
