@@ -105,13 +105,19 @@ export default function PendingInvoicesPage() {
     return list;
   }, [invoices, searchQuery, sortKey, sortAsc]);
 
-  // Stats
+  // Stats - grouped by currency
   const stats = useMemo(() => {
     const withAmount = invoices.filter((i) => i.amount !== null);
-    const totalAmount = withAmount.reduce((sum, i) => sum + (i.amount || 0), 0);
-    const avg = withAmount.length > 0 ? totalAmount / withAmount.length : 0;
-    return { count: invoices.length, totalAmount, avg, withAmount: withAmount.length, noAmount: invoices.length - withAmount.length };
+    const byCurrency: Record<string, number> = {};
+    for (const inv of withAmount) {
+      const cur = inv.currency || "ILS";
+      byCurrency[cur] = (byCurrency[cur] || 0) + (inv.amount || 0);
+    }
+    const avg = withAmount.length > 0 ? withAmount.reduce((s, i) => s + (i.amount || 0), 0) / withAmount.length : 0;
+    return { count: invoices.length, byCurrency, avg, withAmount: withAmount.length };
   }, [invoices]);
+
+  const currencySymbol = (cur: string) => ({ USD: "$", EUR: "€", GBP: "£", ILS: "₪" }[cur] || cur);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -124,7 +130,7 @@ export default function PendingInvoicesPage() {
     setEditData({ vendor: inv.vendor, amount: inv.amount, currency: inv.currency, date: inv.date ? inv.date.split("T")[0] : "", creditCardLast4: inv.creditCardLast4, category: inv.category });
   };
   const saveEdit = async (id: string) => {
-    await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vendor: editData.vendor, amount: editData.amount, date: editData.date || null, categoryId: editData.category?.id || null, creditCardLast4: editData.creditCardLast4 || null }) });
+    await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vendor: editData.vendor, amount: editData.amount, currency: editData.currency, date: editData.date || null, categoryId: editData.category?.id || null, creditCardLast4: editData.creditCardLast4 || null }) });
     setEditingId(null); fetchData();
   };
   const approveOne = async (id: string) => { setApproving(id); await fetch(`/api/invoices/${id}/approve`, { method: "POST" }); setApproving(null); fetchData(); };
@@ -202,7 +208,12 @@ export default function PendingInvoicesPage() {
             <Receipt className="h-3.5 w-3.5" />
             <span className="text-[10px] sm:text-xs">סה&quot;כ ממתין</span>
           </div>
-          <p className="text-sm sm:text-lg font-bold">₪{stats.totalAmount.toLocaleString("he-IL", { maximumFractionDigits: 0 })}</p>
+          <div className="text-sm sm:text-base font-bold space-y-0.5">
+            {Object.entries(stats.byCurrency).map(([cur, total]) => (
+              <div key={cur}>{currencySymbol(cur)}{total.toLocaleString("he-IL", { maximumFractionDigits: 0 })}</div>
+            ))}
+            {Object.keys(stats.byCurrency).length === 0 && <div>₪0</div>}
+          </div>
         </div>
         <div className="rounded-xl bg-card border border-border/60 p-2.5 sm:p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
@@ -336,13 +347,20 @@ export default function PendingInvoicesPage() {
                         <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">ספק</label>
                         <input type="text" value={editData.vendor || ""} onChange={(e) => setEditData({ ...editData, vendor: e.target.value })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
                       </div>
-                      <div>
+                      <div className="sm:col-span-2">
                         <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">סכום</label>
-                        <div className="relative">
-                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
-                            {{ USD: "$", EUR: "€", GBP: "£", ILS: "₪" }[editData.currency || "ILS"] || "₪"}
-                          </span>
-                          <input type="number" step="0.01" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })} className="w-full h-9 rounded-lg border border-input bg-background pr-7 pl-2.5 text-[16px] sm:text-sm" />
+                        <div className="flex gap-1.5">
+                          <input type="number" step="0.01" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
+                          <select
+                            value={editData.currency || "ILS"}
+                            onChange={(e) => setEditData({ ...editData, currency: e.target.value })}
+                            className="h-9 w-[60px] shrink-0 rounded-lg border border-input bg-background text-[16px] sm:text-sm text-center font-medium"
+                          >
+                            <option value="ILS">₪</option>
+                            <option value="USD">$</option>
+                            <option value="EUR">€</option>
+                            <option value="GBP">£</option>
+                          </select>
                         </div>
                       </div>
                       <div>

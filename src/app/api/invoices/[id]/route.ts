@@ -14,7 +14,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { vendor, amount, date, categoryId, creditCardLast4 } = body;
+    const { vendor, amount, currency, date, categoryId, creditCardLast4 } = body;
 
     // Verify invoice belongs to user
     const existing = await prisma.invoice.findUnique({ where: { id } });
@@ -35,6 +35,7 @@ export async function PATCH(
       data: {
         ...(vendor !== undefined && { vendor }),
         ...(amount !== undefined && { amount: amount ? parseFloat(amount) : null }),
+        ...(currency !== undefined && { currency }),
         ...(date !== undefined && { date: date ? new Date(date) : null }),
         ...(categoryId !== undefined && { categoryId }),
         ...(creditCardLast4 !== undefined && { creditCardLast4 }),
