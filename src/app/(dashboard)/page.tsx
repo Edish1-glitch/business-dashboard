@@ -215,8 +215,12 @@ export default function DashboardPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value) => `₪${Number(value).toLocaleString("he-IL")}`}
-                        contentStyle={{ fontSize: 12, borderRadius: 8, padding: "4px 8px" }}
+                        formatter={(value) => [`₪${Number(value).toLocaleString("he-IL")}`, "סכום"]}
+                        contentStyle={{
+                          fontSize: 12, borderRadius: 10, padding: "8px 12px",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb",
+                          background: "white",
+                        }}
                       />
                       <Legend
                         verticalAlign="bottom"
@@ -239,13 +243,19 @@ export default function DashboardPage() {
               {data && data.monthlyData.length > 0 ? (
                 <div className="outline-none select-none" style={{ WebkitTapHighlightColor: "transparent" }}>
                   <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={data.monthlyData}>
+                    <BarChart data={data.monthlyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="month" fontSize={11} />
                       <YAxis fontSize={11} width={40} />
                       <Tooltip
-                        formatter={(value) => `₪${Number(value).toLocaleString("he-IL")}`}
-                        contentStyle={{ fontSize: 12, borderRadius: 8, padding: "4px 8px" }}
+                        formatter={(value) => [`₪${Number(value).toLocaleString("he-IL")}`, "סכום"]}
+                        contentStyle={{
+                          fontSize: 12, borderRadius: 10, padding: "8px 12px",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb",
+                          background: "white", zIndex: 50,
+                        }}
+                        cursor={{ fill: "rgba(139, 92, 246, 0.1)" }}
+                        wrapperStyle={{ zIndex: 50 }}
                       />
                       <Bar dataKey="amount" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
                     </BarChart>
