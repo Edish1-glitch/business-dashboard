@@ -121,7 +121,7 @@ export default function PendingInvoicesPage() {
   };
   const startEdit = (inv: Invoice) => {
     setEditingId(inv.id);
-    setEditData({ vendor: inv.vendor, amount: inv.amount, date: inv.date ? inv.date.split("T")[0] : "", creditCardLast4: inv.creditCardLast4, category: inv.category });
+    setEditData({ vendor: inv.vendor, amount: inv.amount, currency: inv.currency, date: inv.date ? inv.date.split("T")[0] : "", creditCardLast4: inv.creditCardLast4, category: inv.category });
   };
   const saveEdit = async (id: string) => {
     await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vendor: editData.vendor, amount: editData.amount, date: editData.date || null, categoryId: editData.category?.id || null, creditCardLast4: editData.creditCardLast4 || null }) });
@@ -337,8 +337,13 @@ export default function PendingInvoicesPage() {
                         <input type="text" value={editData.vendor || ""} onChange={(e) => setEditData({ ...editData, vendor: e.target.value })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
                       </div>
                       <div>
-                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">סכום (₪)</label>
-                        <input type="number" step="0.01" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
+                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">סכום</label>
+                        <div className="relative">
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                            {{ USD: "$", EUR: "€", GBP: "£", ILS: "₪" }[editData.currency || "ILS"] || "₪"}
+                          </span>
+                          <input type="number" step="0.01" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })} className="w-full h-9 rounded-lg border border-input bg-background pr-7 pl-2.5 text-[16px] sm:text-sm" />
+                        </div>
                       </div>
                       <div>
                         <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">תאריך</label>
