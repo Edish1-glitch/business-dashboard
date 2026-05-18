@@ -238,6 +238,9 @@ export function extractVendor(text: string): string | null {
   const skipPatterns = [
     /^[-=*_~]+$/,                          // separator lines
     /^\d+[/\-.\s\d]*$/,                   // pure numbers/dates
+    /^<[a-z!]/i,                           // HTML tags (<head>, <html>, <!DOCTYPE>)
+    /^\s*$/,                               // empty/whitespace
+    /^[͏\s]+$/,                             // invisible unicode spaces
     // Hebrew
     /(?:חשבונית|מס'|תאריך|עוסק|ח\.פ|טלפון|כתובת|מע"מ)/i,
     /(?:במסמך|ממוחשב|מקור|העתק|מקורי|נאמן)/i,
@@ -247,6 +250,7 @@ export function extractVendor(text: string): string | null {
     /^(?:page\s+\d|p\.\s*\d)/i,
     /^(?:tel|phone|fax|email|website|www\.|http)/i,
     /^(?:bill\s+to|ship\s+to|sold\s+to|remit\s+to)\b/i,
+    /^(?:dear|hello|hi |hey |שלום|היי)/i,   // greetings
     /^--/,
   ];
 

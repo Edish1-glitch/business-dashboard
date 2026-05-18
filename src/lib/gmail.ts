@@ -123,11 +123,15 @@ export async function searchEmails(
     dateFilter += ` before:${beforeStr}`;
   }
 
-  // Strategy 1: Attachments (PDF/images) - but filter by invoice-related subjects
-  const attachmentQuery = `has:attachment (filename:pdf OR filename:jpg OR filename:jpeg OR filename:png) ${dateFilter} -subject:(newsletter OR עדכון OR הודעה OR "terms of service" OR שינוי OR עלון OR ברכות)`;
+  // Negative filter - subjects that are never invoices
+  const negativeFilter = `-subject:(newsletter OR עדכון OR הודעה OR "terms of service" OR שינוי OR עלון OR ברכות OR וובינר OR webinar OR "order confirmation" OR הזמנה OR "your order" OR "shipping" OR משלוח OR הרשמה OR registration OR survey OR סקר)`;
 
-  // Strategy 2: Invoice keywords in subject (catches inline HTML invoices from PayPal, Uber, etc.)
-  const subjectQuery = `subject:(חשבונית OR קבלה OR receipt OR invoice OR "tax invoice" OR "order confirmation" OR הזמנה OR תשלום OR payment OR billing) ${dateFilter} -subject:(newsletter OR spam)`;
+  // Strategy 1: Attachments (PDF/images)
+  const attachmentQuery = `has:attachment (filename:pdf OR filename:jpg OR filename:jpeg OR filename:png) ${dateFilter} ${negativeFilter}`;
+
+  // Strategy 2: Invoice keywords in subject (inline HTML invoices from PayPal, Uber, etc.)
+  // More strict - only clear invoice/receipt keywords, no "order" or "הזמנה"
+  const subjectQuery = `subject:(חשבונית OR קבלה OR receipt OR invoice OR "tax invoice" OR תשלום OR payment OR billing OR "your purchase" OR חיוב) ${dateFilter} ${negativeFilter} -subject:(spam OR failed OR declined OR נדחה)`;
 
   const allIds = new Set<string>();
 
@@ -243,15 +247,36 @@ export async function getInlineInvoice(
 
   // Check if the email body looks like it contains invoice/receipt data
   const bodyToCheck = (htmlBody + textBody).toLowerCase();
-  const invoiceKeywords = [
+
+  // Strong keywords - at least 1 must be present
+  const strongKeywords = [
+    "invoice", "receipt", "חשבונית", "קבלה", "tax invoice",
+    "סה\"כ לתשלום", "סה\"כ כולל", "total:", "amount due",
+    "חשבונית מס", "עוסק מורשה",
+  ];
+  const hasStrongKeyword = strongKeywords.some((kw) => bodyToCheck.includes(kw));
+
+  // Supporting keywords
+  const supportingKeywords = [
     "total", "amount", "סה\"כ", "סכום", "לתשלום", "מע\"מ", "vat", "tax",
-    "invoice", "receipt", "חשבונית", "קבלה", "order", "הזמנה",
     "payment", "תשלום", "charged", "חויב", "billing",
     "$", "₪", "€", "£", "usd", "ils",
   ];
+  const supportCount = supportingKeywords.filter((kw) => bodyToCheck.includes(kw)).length;
 
-  const matchCount = invoiceKeywords.filter((kw) => bodyToCheck.includes(kw)).length;
-  if (matchCount < 3) return null; // Need at least 3 invoice keywords
+  // Reject patterns - these are NOT invoices
+  const rejectPatterns = [
+    "unsubscribe", "הסר מרשימת", "עדכון תנאי", "privacy policy",
+    "וובינר", "webinar", "הרשמה לאירוע", "join us", "register now",
+    "תלוש שכר", "payslip", "salary", "your order has shipped",
+    "shipping confirmation", "track your order", "order confirmation",
+  ];
+  const hasReject = rejectPatterns.some((kw) => bodyToCheck.includes(kw));
+  if (hasReject) return null;
+
+  // Need 1 strong keyword + 2 supporting, OR 4+ supporting
+  if (!hasStrongKeyword && supportCount < 4) return null;
+  if (hasStrongKeyword && supportCount < 2) return null;
 
   return { subject, from, date, htmlBody, textBody };
 }
@@ -388,15 +413,29 @@ function shouldSkipFile(fileName: string): boolean {
     /תדפיס.?חשבון/,
     /OTEK/i,
 
-    // ===== Payslips =====
+    // ===== Payslips / HR =====
     /תלוש.?שכר/,
+    /תלוש.?משכורת/,
     /payslip/i,
     /pay.?stub/i,
     /salary.?slip/i,
+    /wage.?slip/i,
 
     // ===== Trading / Evidence =====
     /trade.?history/i,
     /evidence_/i,
+
+    // ===== Order confirmations / Shipping (not invoices) =====
+    /order.?confirm/i,
+    /shipping.?confirm/i,
+    /delivery.?confirm/i,
+    /track.?your.?order/i,
+
+    // ===== Webinar / Event invites =====
+    /וובינר/,
+    /webinar/i,
+    /הזמנה.?לאירוע/,
+    /invitation/i,
   ];
 
   return skipPatterns.some((p) => p.test(lower) || p.test(fileName));
