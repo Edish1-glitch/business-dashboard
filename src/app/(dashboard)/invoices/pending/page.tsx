@@ -36,6 +36,7 @@ interface Invoice {
   fileName: string;
   vendor: string | null;
   amount: number | null;
+  currency: string | null;
   date: string | null;
   status: string;
   creditCardLast4: string | null;
@@ -150,6 +151,11 @@ export default function PendingInvoicesPage() {
     if (days < 7) return `${days} ימים`;
     if (days < 30) return `${Math.floor(days / 7)} שבועות`;
     return `${Math.floor(days / 30)} חודשים`;
+  };
+
+  const formatAmount = (amount: number, currency?: string | null) => {
+    const sym = { USD: "$", EUR: "€", GBP: "£", ILS: "₪" }[currency || "ILS"] || "₪";
+    return `${sym}${amount.toLocaleString("he-IL")}`;
   };
 
   const getCatBorder = (name: string) => {
@@ -392,7 +398,7 @@ export default function PendingInvoicesPage() {
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-[13px] sm:text-sm truncate">{inv.vendor || inv.fileName}</span>
                         {inv.amount !== null ? (
-                          <span className="font-bold text-sm sm:text-base shrink-0">₪{inv.amount.toLocaleString("he-IL")}</span>
+                          <span className="font-bold text-sm sm:text-base shrink-0">{formatAmount(inv.amount, inv.currency)}</span>
                         ) : (
                           <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>
                         )}

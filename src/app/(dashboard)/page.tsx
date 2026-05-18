@@ -32,6 +32,7 @@ interface DashboardData {
     id: string;
     vendor: string | null;
     amount: number | null;
+    currency: string | null;
     date: string | null;
     category: { name: string; color: string | null } | null;
   }[];
@@ -293,7 +294,7 @@ export default function DashboardPage() {
                         </span>
                       )}
                       {inv.amount !== null && (
-                        <span className="font-bold">₪{inv.amount.toLocaleString("he-IL")}</span>
+                        <span className="font-bold">{({ USD: "$", EUR: "€", GBP: "£", ILS: "₪" }[inv.currency || "ILS"] || "₪")}{inv.amount.toLocaleString("he-IL")}</span>
                       )}
                     </div>
                   </div>
