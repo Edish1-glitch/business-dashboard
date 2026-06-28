@@ -22,6 +22,8 @@ import {
   Receipt,
   Mail,
   TrendingDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -41,6 +43,7 @@ interface Invoice {
   status: string;
   creditCardLast4: string | null;
   category: Category | null;
+  emailAccount: { email: string } | null;
   createdAt?: string;
 }
 
@@ -63,6 +66,9 @@ export default function PendingInvoicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
   const [sortAsc, setSortAsc] = useState(false);
+  const [emailFilter, setEmailFilter] = useState<string>("");
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -81,9 +87,20 @@ export default function PendingInvoicesPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const emailAccounts = useMemo(() => {
+    const set = new Set<string>();
+    for (const inv of invoices) {
+      if (inv.emailAccount?.email) set.add(inv.emailAccount.email);
+    }
+    return [...set].sort();
+  }, [invoices]);
+
   // Filtered + sorted invoices
   const filteredInvoices = useMemo(() => {
     let list = invoices;
+    if (emailFilter) {
+      list = list.filter((inv) => inv.emailAccount?.email === emailFilter);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter((inv) =>
@@ -103,7 +120,16 @@ export default function PendingInvoicesPage() {
       return sortAsc ? cmp : -cmp;
     });
     return list;
-  }, [invoices, searchQuery, sortKey, sortAsc]);
+  }, [invoices, emailFilter, searchQuery, sortKey, sortAsc]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedInvoices = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredInvoices.slice(start, start + pageSize);
+  }, [filteredInvoices, safePage, pageSize]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, emailFilter, sortKey, sortAsc, pageSize]);
 
   // Stats - grouped by currency
   const stats = useMemo(() => {
@@ -123,7 +149,13 @@ export default function PendingInvoicesPage() {
     setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   };
   const toggleSelectAll = () => {
-    setSelected(selected.size === filteredInvoices.length ? new Set() : new Set(filteredInvoices.map((i) => i.id)));
+    const pageIds = paginatedInvoices.map((i) => i.id);
+    const allPageSelected = pageIds.every((id) => selected.has(id));
+    if (allPageSelected) {
+      setSelected((prev) => { const next = new Set(prev); pageIds.forEach((id) => next.delete(id)); return next; });
+    } else {
+      setSelected((prev) => { const next = new Set(prev); pageIds.forEach((id) => next.add(id)); return next; });
+    }
   };
   const startEdit = (inv: Invoice) => {
     setEditingId(inv.id);
@@ -133,10 +165,10 @@ export default function PendingInvoicesPage() {
     await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vendor: editData.vendor, amount: editData.amount, currency: editData.currency, date: editData.date || null, categoryId: editData.category?.id || null, creditCardLast4: editData.creditCardLast4 || null }) });
     setEditingId(null); fetchData();
   };
-  const approveOne = async (id: string) => { setApproving(id); await fetch(`/api/invoices/${id}/approve`, { method: "POST" }); setApproving(null); fetchData(); };
-  const deleteOne = async (id: string) => { setDeleting(id); await fetch(`/api/invoices/${id}`, { method: "DELETE" }); setDeleting(null); setEditingId(null); fetchData(); };
-  const bulkApprove = async () => { if (selected.size === 0) return; setBulkAction(true); await fetch("/api/invoices/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve", ids: [...selected] }) }); setBulkAction(false); fetchData(); };
-  const bulkDelete = async () => { if (selected.size === 0) return; setBulkAction(true); await fetch("/api/invoices/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: [...selected] }) }); setBulkAction(false); fetchData(); };
+  const approveOne = async (id: string) => { setApproving(id); await fetch(`/api/invoices/${id}/approve`, { method: "POST" }); setApproving(null); setInvoices((prev) => prev.filter((i) => i.id !== id)); setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; }); };
+  const deleteOne = async (id: string) => { setDeleting(id); await fetch(`/api/invoices/${id}`, { method: "DELETE" }); setDeleting(null); setEditingId(null); setInvoices((prev) => prev.filter((i) => i.id !== id)); setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; }); };
+  const bulkApprove = async () => { if (selected.size === 0) return; setBulkAction(true); await fetch("/api/invoices/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve", ids: [...selected] }) }); setBulkAction(false); setInvoices((prev) => prev.filter((i) => !selected.has(i.id))); setSelected(new Set()); };
+  const bulkDelete = async () => { if (selected.size === 0) return; setBulkAction(true); await fetch("/api/invoices/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: [...selected] }) }); setBulkAction(false); setInvoices((prev) => prev.filter((i) => !selected.has(i.id))); setSelected(new Set()); };
   const addCategory = async () => {
     if (!newCategoryName.trim() || addingCategory) return;
     setAddingCategory(true);
@@ -191,7 +223,7 @@ export default function PendingInvoicesPage() {
     );
   }
 
-  const allSelected = selected.size === filteredInvoices.length && filteredInvoices.length > 0;
+  const allSelected = paginatedInvoices.length > 0 && paginatedInvoices.every((i) => selected.has(i.id));
 
   return (
     <div data-tour="pending-list" className="space-y-3 max-w-5xl mx-auto">
@@ -243,7 +275,7 @@ export default function PendingInvoicesPage() {
             className="w-full h-9 rounded-lg border border-input bg-background pr-8 pl-3 text-[16px] sm:text-xs"
           />
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {([
             ["created", "חדש"],
             ["amount", "סכום"],
@@ -263,6 +295,18 @@ export default function PendingInvoicesPage() {
               {sortKey === key && <span className="mr-0.5">{sortAsc ? "↑" : "↓"}</span>}
             </button>
           ))}
+          {emailAccounts.length > 0 && (
+            <select
+              value={emailFilter}
+              onChange={(e) => setEmailFilter(e.target.value)}
+              className="h-8 px-2 rounded-lg text-[11px] bg-muted/50 text-muted-foreground border-none cursor-pointer"
+            >
+              <option value="">כל החשבונות</option>
+              {emailAccounts.map((email) => (
+                <option key={email} value={email}>{email}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -283,6 +327,37 @@ export default function PendingInvoicesPage() {
               {bulkAction ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
               מחק
             </Button>
+            <Button variant="outline" size="sm" disabled={bulkAction} onClick={async () => {
+              setBulkAction(true);
+              try {
+                const res = await fetch("/api/invoices/bulk-download", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ids: [...selected] }),
+                });
+                if (!res.ok) throw new Error();
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                const disposition = res.headers.get("Content-Disposition") || "";
+                const utf8Match = disposition.match(/filename\*=UTF-8''(.+?)(?:;|$)/);
+                const asciiMatch = disposition.match(/filename="(.+?)"/);
+                const rawName = utf8Match?.[1] || asciiMatch?.[1] || "invoices.zip";
+                a.download = decodeURIComponent(rawName);
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              } catch {
+                alert("שגיאה בהורדת הקבצים");
+              } finally {
+                setBulkAction(false);
+              }
+            }} className="gap-1 h-7 text-[11px]">
+              {bulkAction ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+              הורד הכל
+            </Button>
           </>
         )}
         {searchQuery && (
@@ -292,7 +367,7 @@ export default function PendingInvoicesPage() {
 
       {/* Preview modal */}
       {previewId && (() => {
-        const previewInv = filteredInvoices.find((i) => i.id === previewId);
+        const previewInv = invoices.find((i) => i.id === previewId);
         const isHtml = previewInv?.fileName.endsWith(".html");
         return (
           <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4" onClick={() => setPreviewId(null)}>
@@ -320,7 +395,7 @@ export default function PendingInvoicesPage() {
 
       {/* Invoice cards */}
       <div className="grid gap-2">
-        {filteredInvoices.map((inv) => {
+        {paginatedInvoices.map((inv) => {
           const isEditing = editingId === inv.id;
           const isSelected = selected.has(inv.id);
           const catBorder = inv.category ? getCatBorder(inv.category.name) : "border-l-amber-400";
@@ -489,6 +564,66 @@ export default function PendingInvoicesPage() {
           );
         })}
       </div>
+
+      {/* Pagination */}
+      {filteredInvoices.length > 0 && (
+        <div className="flex items-center justify-between gap-2 pt-2 pb-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="h-8 px-2 rounded-lg text-[11px] bg-muted/50 text-muted-foreground border-none cursor-pointer"
+            >
+              {[5, 10, 20, 50, 100].map((n) => (
+                <option key={n} value={n}>{n} בעמוד</option>
+              ))}
+            </select>
+            <span className="text-[11px] text-muted-foreground">
+              {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filteredInvoices.length)} מתוך {filteredInvoices.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+              .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1]) > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                p === "..." ? (
+                  <span key={`dot-${i}`} className="text-[11px] text-muted-foreground px-1">...</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`h-8 min-w-[32px] px-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                      p === safePage
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

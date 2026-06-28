@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/api-auth";
 import { getGmailClient, searchEmails, getAttachments, getInlineInvoice, htmlToText } from "@/lib/gmail";
 import { processAndSave, splitPdfToPageBuffers } from "@/lib/invoice-processor";
-import { extractInvoiceData } from "@/lib/pdf/categorize";
+import { extractInvoiceData, isNegativeInvoice, hasInvoiceSignals } from "@/lib/pdf/categorize";
 import { R2_LIMITS } from "@/lib/r2";
 
 // R2 free tier: 10GB. Stop at 8GB to leave buffer.
@@ -208,7 +208,7 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
                     stoppedEarly = true;
                     break;
                   }
-                  const result = await processAndSave(page.buffer, page.fileName, userId, page.isImage, "email");
+                  const result = await processAndSave(page.buffer, page.fileName, userId, page.isImage, "email", account.id);
                   if (result.duplicate) totalDuplicates++;
                   else if (result.id) { totalInvoicesFound++; totalStorageAdded += page.buffer.length; }
                 }
@@ -223,10 +223,14 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
               if (inline) {
                 msgDate = inline.date;
                 const text = inline.textBody || htmlToText(inline.htmlBody);
+
+                if (isNegativeInvoice(text) || isNegativeInvoice(inline.subject)) continue;
+                if (!hasInvoiceSignals(text) && !hasInvoiceSignals(inline.subject)) continue;
+
                 const invoiceData = extractInvoiceData(text);
 
-                // Only save if we found meaningful data (at least vendor or amount)
-                if (invoiceData.vendor || invoiceData.amount) {
+                // Only save if we found meaningful data (amount is required)
+                if (invoiceData.amount) {
                   // Save HTML for preview, text for OCR data
                   const htmlContent = inline.htmlBody || `<pre>${text}</pre>`;
                   const buffer = Buffer.from(htmlContent, "utf-8");
@@ -258,6 +262,7 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
                         creditCardLast4: invoiceData.creditCardLast4,
                         categoryId,
                         userId,
+                        emailAccountId: account.id,
                       },
                     });
                     totalInvoicesFound++;

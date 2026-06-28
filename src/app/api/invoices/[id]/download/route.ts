@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { readFile } from "fs/promises";
 import { downloadFromR2 } from "@/lib/r2";
+import { htmlToPdf } from "@/lib/html-to-pdf";
 
 /**
  * Get file buffer from R2, DB (base64), or local filesystem.
@@ -32,16 +33,34 @@ export async function GET(
   }
 
   try {
-    const buffer = await getFileBuffer(invoice);
+    let buffer = await getFileBuffer(invoice);
+    const isHtml = invoice.fileName.endsWith(".html") || invoice.filePath === "inline-html";
     const isImage = invoice.fileName.match(/\.(jpg|jpeg|png|webp)$/i);
 
+    let contentType: string;
+    let fileName = invoice.fileName;
+
+    if (isHtml) {
+      const html = buffer.toString("utf-8");
+      buffer = await htmlToPdf(html);
+      contentType = "application/pdf";
+      fileName = fileName.replace(/\.html$/, ".pdf");
+      if (!fileName.endsWith(".pdf")) fileName += ".pdf";
+    } else if (isImage) {
+      contentType = "image/png";
+    } else {
+      contentType = "application/pdf";
+    }
+
+    const encodedName = encodeURIComponent(fileName);
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
-        "Content-Type": isImage ? "image/png" : "application/pdf",
-        "Content-Disposition": `attachment; filename="${invoice.fileName}"`,
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="${encodedName}"; filename*=UTF-8''${encodedName}`,
       },
     });
-  } catch {
-    return NextResponse.json({ error: "הקובץ לא נמצא" }, { status: 404 });
+  } catch (err) {
+    console.error("Download error for invoice", id, err);
+    return NextResponse.json({ error: "שגיאה בהורדת הקובץ" }, { status: 500 });
   }
 }

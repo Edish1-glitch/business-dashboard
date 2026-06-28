@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import { splitPdfToPages } from "@/lib/pdf/split";
 import { extractTextFromPdf } from "@/lib/pdf/extract";
 import { ocrFromImage } from "@/lib/pdf/ocr-image";
-import { extractInvoiceData } from "@/lib/pdf/categorize";
+import { extractInvoiceData, isNegativeInvoice, hasInvoiceSignals } from "@/lib/pdf/categorize";
 import { prisma } from "@/lib/db";
 import { uploadToR2, isR2Configured, R2_LIMITS } from "@/lib/r2";
 import { writeFile, mkdir } from "fs/promises";
@@ -31,7 +31,8 @@ export async function processAndSave(
   fileName: string,
   userId: string,
   isImage: boolean,
-  source: string = isImage ? "image-upload" : "pdf-upload"
+  source: string = isImage ? "image-upload" : "pdf-upload",
+  emailAccountId?: string
 ): Promise<ProcessResult> {
   const fileHash = createHash("sha256").update(buffer).digest("hex");
 
@@ -61,6 +62,25 @@ export async function processAndSave(
   try {
     text = isImage ? await ocrFromImage(buffer) : await extractTextFromPdf(buffer);
   } catch { /* continue */ }
+
+  if (text && isNegativeInvoice(text)) {
+    return {
+      id: null, fileName, vendor: null, amount: null, date: null, category: null,
+      creditCardLast4: null, duplicate: false,
+      message: "תוכן שלילי (unsuccessful/failed/declined/טופס רפואי) - דולג",
+      similarWarning: null,
+    };
+  }
+
+  if (source === "email" && text && !hasInvoiceSignals(text)) {
+    return {
+      id: null, fileName, vendor: null, amount: null, date: null, category: null,
+      creditCardLast4: null, duplicate: false,
+      message: "לא נמצאו סימני חשבונית בתוכן - דולג",
+      similarWarning: null,
+    };
+  }
+
   const invoiceData = extractInvoiceData(text);
 
   // Save file - R2 or local+DB fallback
@@ -111,7 +131,7 @@ export async function processAndSave(
       source,
       status: "pending",
       creditCardLast4: invoiceData.creditCardLast4,
-      categoryId, userId,
+      categoryId, userId, emailAccountId,
     },
   });
 

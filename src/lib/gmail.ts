@@ -123,20 +123,25 @@ export async function searchEmails(
     dateFilter += ` before:${beforeStr}`;
   }
 
-  // Negative filter - subjects that are never invoices
-  const negativeFilter = `-subject:(newsletter OR עדכון OR הודעה OR "terms of service" OR שינוי OR עלון OR ברכות OR וובינר OR webinar OR "order confirmation" OR הזמנה OR "your order" OR "shipping" OR משלוח OR הרשמה OR registration OR survey OR סקר)`;
+  const negativeFilter = [
+    `-subject:(newsletter OR עדכון OR עלון OR ברכות OR וובינר OR webinar)`,
+    `-subject:("terms of service" OR "terms and conditions" OR תקנון OR "privacy policy")`,
+    `-subject:(הרשמה OR registration OR survey OR סקר OR unsubscribe)`,
+    `-subject:("shipping" OR משלוח OR "track your" OR "delivery")`,
+    `-subject:(תאונה OR "accident" OR רפואי OR "medical" OR "insurance claim")`,
+    `-subject:(unsuccessful OR failed OR declined OR נדחה OR spam)`,
+  ].join(" ");
 
-  // Strategy 1: Attachments (PDF/images)
-  const attachmentQuery = `has:attachment (filename:pdf OR filename:jpg OR filename:jpeg OR filename:png) ${dateFilter} ${negativeFilter}`;
+  // Strategy 1: PDFs with invoice-like subjects (not ALL PDFs)
+  const pdfQuery = `has:attachment filename:pdf (subject:(חשבונית OR קבלה OR invoice OR receipt OR "tax invoice" OR תשלום OR payment OR billing OR חיוב OR "payment confirmation" OR "אישור תשלום") OR from:(paypal OR stripe OR invoice OR billing OR receipt OR noreply OR no-reply)) ${dateFilter} ${negativeFilter}`;
 
-  // Strategy 2: Invoice keywords in subject (inline HTML invoices from PayPal, Uber, etc.)
-  // More strict - only clear invoice/receipt keywords, no "order" or "הזמנה"
-  const subjectQuery = `subject:(חשבונית OR קבלה OR receipt OR invoice OR "tax invoice" OR תשלום OR payment OR billing OR "your purchase" OR חיוב) ${dateFilter} ${negativeFilter} -subject:(spam OR failed OR declined OR נדחה)`;
+  // Strategy 2: Invoice keywords in subject (inline HTML invoices)
+  const subjectQuery = `subject:(חשבונית OR קבלה OR receipt OR invoice OR "tax invoice" OR תשלום OR payment OR billing OR "your purchase" OR חיוב OR "אישור תשלום" OR "payment confirmation") ${dateFilter} ${negativeFilter}`;
 
   const allIds = new Set<string>();
 
   // Run both queries
-  for (const query of [attachmentQuery, subjectQuery]) {
+  for (const query of [pdfQuery, subjectQuery]) {
     let pageToken: string | undefined;
 
     do {

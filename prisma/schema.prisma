@@ -79,13 +79,16 @@ model Invoice {
   categoryId      String?
   category        Category? @relation(fields: [categoryId], references: [id])
   userId          String
-  user            User      @relation(fields: [userId], references: [id])
+  user            User          @relation(fields: [userId], references: [id])
+  emailAccountId  String?
+  emailAccount    EmailAccount? @relation(fields: [emailAccountId], references: [id])
   expenses        Expense[]
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime      @default(now())
 
   @@index([userId])
   @@index([source])
   @@index([status])
+  @@index([emailAccountId])
 }
 
 model EmailAccount {
@@ -99,6 +102,7 @@ model EmailAccount {
   tokenExpiresAt DateTime?
   lastSyncAt   DateTime?
   syncRanges   SyncRange[]
+  invoices     Invoice[]
   createdAt    DateTime @default(now())
 
   @@unique([email, userId])

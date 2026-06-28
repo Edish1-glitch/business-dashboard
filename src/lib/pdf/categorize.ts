@@ -292,6 +292,67 @@ export function extractCreditCardLast4(text: string): string | null {
   return null;
 }
 
+const NEGATIVE_KEYWORDS = [
+  // Failed/reversed payments
+  "unsuccessful", "failed", "declined", "refund", "refunded",
+  "cancelled", "canceled", "void", "reversed", "chargeback",
+  // Medical / insurance forms
+  "תעודה רפואית", "נפגע בתאונה", "פרטי התאונה", "שעת הפגיעה",
+  "אישור מחלה", "תעודת מחלה", "הפסקת עבודה",
+  "ביטוח לאומי", "המוסד לביטוח לאומי", "דמי תאונה",
+  "שמאי", "הצעת תיקון ושומה", "חוות דעת שמאי",
+  // Terms & conditions / legal
+  "תנאי שימוש", "תנאי פוליסה", "terms of service", "terms and conditions",
+  "privacy policy", "מדיניות פרטיות", "תקנון",
+  // Tech / screenshots (not invoices)
+  "what is my ip", "vpn connected", "tor browser",
+  "speedtest", "speed test",
+  // Newsletters / marketing
+  "unsubscribe", "הסרה מרשימת תפוצה", "להסרה מרשימת",
+  "click here to unsubscribe", "manage preferences",
+  // Spam / promotions
+  "limited time offer", "act now", "הצעה מוגבלת",
+  "win a ", "congratulations you",
+];
+
+const NEGATIVE_PATTERNS = [
+  /תעודת?\s+רפואית/,
+  /נפגע\s+ב?תאונ[הת]/,
+  /פרטי\s+ה?תאונ[הת]/,
+  /דו"?ח\s+(?:רפואי|שמאי|תאונ)/,
+  /(?:הראל|מגדל|הפניקס|כלל|מנורה)\s+(?:ביטוח|רכוש|חיים)/,
+  /(?:פוליס[הת]|תביע[הת])\s+(?:ביטוח|רכב|חיים|בריאות)/,
+  /(?:medical|accident)\s+(?:report|form|certificate)/i,
+  /(?:insurance)\s+(?:claim|policy|terms|conditions)/i,
+];
+
+const INVOICE_SIGNALS_HE = [
+  "חשבונית", "קבלה", "חיוב", "תשלום", "סה\"כ",
+  "סכום", "מע\"מ", "עוסק מורשה", "ח.פ", "ע.מ",
+  "לתשלום", "שולם", "התקבל", "אישור תשלום",
+];
+
+const INVOICE_SIGNALS_EN = [
+  "invoice", "receipt", "billing", "payment",
+  "total", "amount due", "subtotal", "tax",
+  "paid", "charge", "transaction",
+  "order total", "purchase", "subscription",
+];
+
+export function isNegativeInvoice(text: string): boolean {
+  const lower = text.toLowerCase();
+  if (NEGATIVE_KEYWORDS.some((kw) => lower.includes(kw))) return true;
+  if (NEGATIVE_PATTERNS.some((p) => p.test(text))) return true;
+  return false;
+}
+
+export function hasInvoiceSignals(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hasHebrew = INVOICE_SIGNALS_HE.some((s) => lower.includes(s.toLowerCase()));
+  const hasEnglish = INVOICE_SIGNALS_EN.some((s) => lower.includes(s));
+  return hasHebrew || hasEnglish;
+}
+
 /**
  * Full invoice data extraction from text.
  */
