@@ -1,12 +1,15 @@
 FROM node:20-slim AS base
 
-# Install tesseract + poppler for OCR
+# Install tesseract + poppler for OCR, chromium for HTML-to-PDF
 RUN apt-get update && apt-get install -y \
   tesseract-ocr \
   tesseract-ocr-heb \
   tesseract-ocr-eng \
   poppler-utils \
+  chromium \
   && rm -rf /var/lib/apt/lists/*
+
+ENV CHROMIUM_PATH=/usr/bin/chromium
 
 WORKDIR /app
 

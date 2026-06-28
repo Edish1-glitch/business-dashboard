@@ -1,6 +1,15 @@
-import puppeteer, { Browser } from "puppeteer";
+import puppeteer, { Browser } from "puppeteer-core";
 
 let browserInstance: Browser | null = null;
+
+function getChromePath(): string {
+  if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
+  if (process.platform === "darwin") {
+    return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  }
+  // Linux (Docker / Render)
+  return "/usr/bin/chromium";
+}
 
 async function getBrowser(): Promise<Browser> {
   if (browserInstance) {
@@ -12,6 +21,7 @@ async function getBrowser(): Promise<Browser> {
   }
   browserInstance = await puppeteer.launch({
     headless: true,
+    executablePath: getChromePath(),
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -26,7 +36,7 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
   let browser: Browser;
   try {
     browser = await getBrowser();
-  } catch (err) {
+  } catch {
     browserInstance = null;
     browser = await getBrowser();
   }
