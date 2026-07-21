@@ -163,7 +163,8 @@ export default function PendingInvoicesPage() {
   };
   const saveEdit = async (id: string) => {
     await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vendor: editData.vendor, amount: editData.amount, currency: editData.currency, date: editData.date || null, categoryId: editData.category?.id || null, creditCardLast4: editData.creditCardLast4 || null }) });
-    setEditingId(null); fetchData();
+    setEditingId(null);
+    setInvoices((prev) => prev.map((inv) => inv.id === id ? { ...inv, vendor: editData.vendor ?? inv.vendor, amount: editData.amount ?? inv.amount, currency: editData.currency ?? inv.currency, date: editData.date ?? inv.date, creditCardLast4: editData.creditCardLast4 ?? inv.creditCardLast4, category: editData.category ?? inv.category } : inv));
   };
   const approveOne = async (id: string) => { setApproving(id); await fetch(`/api/invoices/${id}/approve`, { method: "POST" }); setApproving(null); setInvoices((prev) => prev.filter((i) => i.id !== id)); setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; }); };
   const deleteOne = async (id: string) => { setDeleting(id); await fetch(`/api/invoices/${id}`, { method: "DELETE" }); setDeleting(null); setEditingId(null); setInvoices((prev) => prev.filter((i) => i.id !== id)); setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; }); };
