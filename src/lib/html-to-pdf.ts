@@ -1,7 +1,5 @@
 import puppeteer, { Browser } from "puppeteer-core";
 
-let browserInstance: Browser | null = null;
-
 function getChromePath(): string {
   if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
   if (process.platform === "darwin") {
@@ -11,15 +9,20 @@ function getChromePath(): string {
   return "/usr/bin/chromium";
 }
 
-async function getBrowser(): Promise<Browser> {
-  if (browserInstance) {
-    try {
-      if (browserInstance.connected) return browserInstance;
-    } catch { /* browser crashed */ }
-    try { await browserInstance.close(); } catch { /* ignore */ }
-    browserInstance = null;
-  }
-  browserInstance = await puppeteer.launch({
+/**
+ * Convert HTML to a PDF buffer.
+ *
+ * Memory note: we deliberately launch a FRESH Chromium per call and close it
+ * immediately afterwards, rather than keeping a persistent singleton browser.
+ * On Render's 512MB free instance a resident Chromium (~150-300MB) kept the
+ * process near its memory ceiling and any conversion tipped it into an OOM
+ * restart (observed 2026-07-21). Launching per-call releases that memory as
+ * soon as the PDF is produced; the tradeoff is ~1s extra startup per call,
+ * which is negligible for our volume. The extra flags (--single-process /
+ * --no-zygote) further cut peak memory during conversion.
+ */
+export async function htmlToPdf(html: string): Promise<Buffer> {
+  const browser: Browser = await puppeteer.launch({
     headless: true,
     executablePath: getChromePath(),
     args: [
@@ -27,22 +30,14 @@ async function getBrowser(): Promise<Browser> {
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
+      "--single-process",
+      "--no-zygote",
+      "--disable-extensions",
     ],
   });
-  return browserInstance;
-}
 
-export async function htmlToPdf(html: string): Promise<Buffer> {
-  let browser: Browser;
   try {
-    browser = await getBrowser();
-  } catch {
-    browserInstance = null;
-    browser = await getBrowser();
-  }
-
-  const page = await browser.newPage();
-  try {
+    const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 });
     const pdf = await page.pdf({
       format: "A4",
@@ -51,6 +46,7 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
     });
     return Buffer.from(pdf);
   } finally {
-    try { await page.close(); } catch { /* ignore */ }
+    // Always release Chromium's memory, even if conversion failed.
+    try { await browser.close(); } catch { /* ignore */ }
   }
 }
