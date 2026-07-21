@@ -2,11 +2,12 @@ name: Keep Render awake
 
 # Render's free tier spins the instance down after ~15 min of inactivity, and
 # waking it takes ~50s (the "slow to load / can't navigate" symptom). This job
-# pings the app every ~10 min so it stays warm. GitHub cron is best-effort and
-# may run a few minutes late, so 10 min leaves margin under the 15 min window.
+# pings the app every ~5 min so it stays warm. GitHub cron is best-effort and
+# often runs several minutes late, so 5 min leaves plenty of margin under the
+# 15 min spin-down window. (Repo is public → Actions minutes are free.)
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 jobs:
