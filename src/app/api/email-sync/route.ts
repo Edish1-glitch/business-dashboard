@@ -108,6 +108,7 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
       let storageUsed = await getStorageUsed();
       let lastProcessedDate: Date | null = null;
       let stoppedEarly = false;
+      const failedAccounts: { email: string; reason: string; needsReconnect: boolean }[] = [];
 
       const accounts = await prisma.emailAccount.findMany({
         where: { id: { in: accountIds }, userId },
@@ -137,9 +138,17 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
         try {
           gmail = await getGmailClient(account);
         } catch (err) {
+          const raw = err instanceof Error ? err.message : "שגיאה";
+          // invalid_grant / auth errors mean the account's token is no longer valid.
+          const needsReconnect = /invalid_grant|invalid_token|unauthorized|לא מחובר/i.test(raw);
+          failedAccounts.push({
+            email: account.email,
+            reason: needsReconnect ? "החיבור פג — צריך לחבר מחדש" : raw,
+            needsReconnect,
+          });
           send({
             type: "progress",
-            message: `שגיאה בהתחברות ל-${account.email}: ${err instanceof Error ? err.message : "שגיאה"}`,
+            message: `⚠️ ${account.email}: ${needsReconnect ? "החיבור פג, צריך לחבר מחדש" : raw}`,
             total: 0, current: 0,
           });
           continue;
@@ -149,9 +158,12 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
         try {
           messageIds = await searchEmails(gmail, syncFrom, toDate);
         } catch (err) {
+          const raw = err instanceof Error ? err.message : "שגיאה";
+          const needsReconnect = /invalid_grant|invalid_token|unauthorized/i.test(raw);
+          failedAccounts.push({ email: account.email, reason: needsReconnect ? "החיבור פג — צריך לחבר מחדש" : raw, needsReconnect });
           send({
             type: "progress",
-            message: `שגיאה בחיפוש מיילים ב-${account.email}: ${err instanceof Error ? err.message : "שגיאה"}`,
+            message: `⚠️ שגיאה בחיפוש מיילים ב-${account.email}: ${raw}`,
             total: 0, current: 0,
           });
           continue;
@@ -327,14 +339,26 @@ async function syncAccounts(userId: string, accountIds: string[], afterDate: Dat
         summaryMessage += `\nהסנכרון הגיע עד ${lastProcessedDate.toLocaleDateString("he-IL")}. ניתן להמשיך מאוחר יותר.`;
       }
 
+      // Surface accounts that could not be synced so a failed sync is never
+      // mistaken for a successful empty one.
+      if (failedAccounts.length > 0) {
+        summaryMessage += `\n\n⚠️ ${failedAccounts.length} חשבונות לא סונכרנו:`;
+        for (const f of failedAccounts) {
+          summaryMessage += `\n• ${f.email} — ${f.reason}`;
+        }
+        const anyReconnect = failedAccounts.some((f) => f.needsReconnect);
+        if (anyReconnect) summaryMessage += `\nחבר מחדש את החשבון/ות מכפתור "חבר Gmail" ונסה שוב.`;
+      }
+
       send({
         type: "done",
-        success: true,
+        success: failedAccounts.length === 0,
         totalInvoices: totalInvoicesFound,
         duplicatesSkipped: totalDuplicates,
         storageUsedGB: usedGB,
         storageRemainingGB: remainingGB,
         stoppedEarly,
+        failedAccounts,
         lastProcessedDate: lastProcessedDate?.toISOString() || null,
         message: summaryMessage,
       });
