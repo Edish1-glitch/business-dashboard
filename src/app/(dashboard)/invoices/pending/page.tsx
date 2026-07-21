@@ -24,6 +24,7 @@ import {
   TrendingDown,
   ChevronLeft,
   ChevronRight,
+  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -70,6 +71,15 @@ export default function PendingInvoicesPage() {
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // range filters (collapsible panel)
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCategory, setFilterCategory] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [amountMin, setAmountMin] = useState("");
+  const [amountMax, setAmountMax] = useState("");
+  const [amountCurrency, setAmountCurrency] = useState("");
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -101,6 +111,14 @@ export default function PendingInvoicesPage() {
     if (emailFilter) {
       list = list.filter((inv) => inv.emailAccount?.email === emailFilter);
     }
+    if (filterCategory) list = list.filter((inv) => inv.category?.name === filterCategory);
+    // date range (compares the YYYY-MM-DD part; invoices with no date are excluded when a bound is set)
+    if (dateFrom) list = list.filter((inv) => inv.date && inv.date.slice(0, 10) >= dateFrom);
+    if (dateTo) list = list.filter((inv) => inv.date && inv.date.slice(0, 10) <= dateTo);
+    // amount range + optional currency
+    if (amountCurrency) list = list.filter((inv) => (inv.currency || "ILS") === amountCurrency);
+    if (amountMin !== "") list = list.filter((inv) => inv.amount !== null && inv.amount >= Number(amountMin));
+    if (amountMax !== "") list = list.filter((inv) => inv.amount !== null && inv.amount <= Number(amountMax));
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter((inv) =>
@@ -120,7 +138,10 @@ export default function PendingInvoicesPage() {
       return sortAsc ? cmp : -cmp;
     });
     return list;
-  }, [invoices, emailFilter, searchQuery, sortKey, sortAsc]);
+  }, [invoices, emailFilter, filterCategory, searchQuery, sortKey, sortAsc, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
+
+  const activeFilterCount = [filterCategory, dateFrom, dateTo, amountMin, amountMax, amountCurrency].filter(Boolean).length;
+  const clearFilters = () => { setFilterCategory(""); setDateFrom(""); setDateTo(""); setAmountMin(""); setAmountMax(""); setAmountCurrency(""); };
 
   const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
@@ -129,7 +150,7 @@ export default function PendingInvoicesPage() {
     return filteredInvoices.slice(start, start + pageSize);
   }, [filteredInvoices, safePage, pageSize]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchQuery, emailFilter, sortKey, sortAsc, pageSize]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, emailFilter, sortKey, sortAsc, pageSize, filterCategory, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
 
   // Stats - grouped by currency
   const stats = useMemo(() => {
@@ -207,11 +228,6 @@ export default function PendingInvoicesPage() {
     return colors[name] || "border-l-gray-400";
   };
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(false); }
-  };
-
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 text-primary animate-spin" /></div>;
 
   if (invoices.length === 0) {
@@ -276,40 +292,94 @@ export default function PendingInvoicesPage() {
             className="w-full h-9 rounded-lg border border-input bg-background pr-8 pl-3 text-[16px] sm:text-xs"
           />
         </div>
-        <div className="flex gap-1 flex-wrap">
-          {([
-            ["created", "חדש"],
-            ["amount", "סכום"],
-            ["date", "תאריך"],
-            ["vendor", "ספק"],
-          ] as [SortKey, string][]).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => handleSort(key)}
-              className={`h-8 px-2 rounded-lg text-[11px] transition-colors ${
-                sortKey === key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {label}
-              {sortKey === key && <span className="mr-0.5">{sortAsc ? "↑" : "↓"}</span>}
-            </button>
-          ))}
-          {emailAccounts.length > 0 && (
+        {/* Sort dropdown + direction + filter toggle */}
+        <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 h-9 rounded-lg bg-muted/50 pr-2">
+            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
             <select
-              value={emailFilter}
-              onChange={(e) => setEmailFilter(e.target.value)}
-              className="h-8 px-2 rounded-lg text-[11px] bg-muted/50 text-muted-foreground border-none cursor-pointer"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="h-9 bg-transparent text-[11px] sm:text-xs text-foreground border-none cursor-pointer focus:outline-none"
+              title="מיין לפי"
             >
-              <option value="">כל החשבונות</option>
-              {emailAccounts.map((email) => (
-                <option key={email} value={email}>{email}</option>
-              ))}
+              <option value="created">מיין: חדש</option>
+              <option value="date">מיין: תאריך</option>
+              <option value="amount">מיין: סכום</option>
+              <option value="vendor">מיין: ספק</option>
             </select>
-          )}
+            <button onClick={() => setSortAsc((v) => !v)} className="text-muted-foreground hover:text-foreground text-sm w-5 shrink-0" title={sortAsc ? "עולה" : "יורד"}>
+              {sortAsc ? "↑" : "↓"}
+            </button>
+          </div>
+          <button
+            onClick={() => setShowFilters((s) => !s)}
+            className={`h-9 px-2.5 rounded-lg text-[11px] sm:text-xs flex items-center gap-1 transition-colors shrink-0 ${showFilters || activeFilterCount > 0 ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}
+          >
+            <Filter className="h-3.5 w-3.5" /> סינון{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+          </button>
         </div>
       </div>
+
+      {/* Collapsible filter panel: account, category, date range, amount range + currency */}
+      {showFilters && (
+        <div className="rounded-xl bg-card border border-border/60 p-3 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Date range */}
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 flex items-center gap-1"><Calendar className="h-3 w-3" /> טווח תאריכים</label>
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                <span className="text-muted-foreground text-xs">—</span>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+              </div>
+            </div>
+            {/* Amount range + currency */}
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">טווח סכומים</label>
+              <div className="flex items-center gap-1.5">
+                <input type="number" inputMode="decimal" placeholder="מ-" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                <span className="text-muted-foreground text-xs">—</span>
+                <input type="number" inputMode="decimal" placeholder="עד" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                <select value={amountCurrency} onChange={(e) => setAmountCurrency(e.target.value)} className="h-9 w-[54px] shrink-0 rounded-lg border border-input bg-background text-[13px] text-center" title="מטבע">
+                  <option value="">הכל</option>
+                  <option value="ILS">₪</option>
+                  <option value="USD">$</option>
+                  <option value="EUR">€</option>
+                  <option value="GBP">£</option>
+                </select>
+              </div>
+            </div>
+            {/* Category */}
+            {categories.length > 0 && (
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">קטגוריה</label>
+                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]">
+                  <option value="">כל הקטגוריות</option>
+                  {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                </select>
+              </div>
+            )}
+            {/* Email account */}
+            {emailAccounts.length > 0 && (
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 flex items-center gap-1"><Mail className="h-3 w-3" /> חשבון אימייל</label>
+                <select value={emailFilter} onChange={(e) => setEmailFilter(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]">
+                  <option value="">כל החשבונות</option>
+                  {emailAccounts.map((email) => <option key={email} value={email}>{email}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">{filteredInvoices.length} תוצאות</span>
+            {(activeFilterCount > 0 || emailFilter) && (
+              <button onClick={() => { clearFilters(); setEmailFilter(""); }} className="text-[11px] text-red-500 hover:text-red-700 flex items-center gap-1">
+                <X className="h-3 w-3" /> נקה סינון
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 3. Sticky bulk action bar */}
       <div className="sticky top-16 z-30 bg-background/90 backdrop-blur-sm py-1.5 -mx-2 px-2 sm:-mx-4 sm:px-4 flex items-center gap-2 flex-wrap">

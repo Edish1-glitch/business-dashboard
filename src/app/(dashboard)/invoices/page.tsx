@@ -26,6 +26,8 @@ import {
   ChevronRight,
   CornerUpLeft,
   Building2,
+  Filter,
+  ArrowUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -87,6 +89,14 @@ export default function InvoicesPage() {
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // range filters (collapsible panel)
+  const [showFilters, setShowFilters] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [amountMin, setAmountMin] = useState("");
+  const [amountMax, setAmountMax] = useState("");
+  const [amountCurrency, setAmountCurrency] = useState("");
+
   // selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -135,6 +145,13 @@ export default function InvoicesPage() {
     if (filterCategory) list = list.filter((inv) => inv.category?.name === filterCategory);
     if (sentFilter === "sent") list = list.filter((inv) => inv.sends.length > 0);
     if (sentFilter === "unsent") list = list.filter((inv) => inv.sends.length === 0);
+    // date range (compares the YYYY-MM-DD part; invoices with no date are excluded when a bound is set)
+    if (dateFrom) list = list.filter((inv) => inv.date && inv.date.slice(0, 10) >= dateFrom);
+    if (dateTo) list = list.filter((inv) => inv.date && inv.date.slice(0, 10) <= dateTo);
+    // amount range + optional currency
+    if (amountCurrency) list = list.filter((inv) => (inv.currency || "ILS") === amountCurrency);
+    if (amountMin !== "") list = list.filter((inv) => inv.amount !== null && inv.amount >= Number(amountMin));
+    if (amountMax !== "") list = list.filter((inv) => inv.amount !== null && inv.amount <= Number(amountMax));
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter((inv) =>
@@ -155,7 +172,10 @@ export default function InvoicesPage() {
       return sortAsc ? cmp : -cmp;
     });
     return list;
-  }, [invoices, filterCategory, sentFilter, searchQuery, sortKey, sortAsc]);
+  }, [invoices, filterCategory, sentFilter, searchQuery, sortKey, sortAsc, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
+
+  const activeFilterCount = [dateFrom, dateTo, amountMin, amountMax, amountCurrency, filterCategory].filter(Boolean).length;
+  const clearFilters = () => { setDateFrom(""); setDateTo(""); setAmountMin(""); setAmountMax(""); setAmountCurrency(""); setFilterCategory(""); };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
@@ -164,7 +184,7 @@ export default function InvoicesPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, safePage, pageSize]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchQuery, filterCategory, sentFilter, sortKey, sortAsc, pageSize]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, filterCategory, sentFilter, sortKey, sortAsc, pageSize, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
 
   // stats
   const stats = useMemo(() => {
@@ -198,11 +218,6 @@ export default function InvoicesPage() {
       .map((inv) => inv.id);
     setSelected(new Set(ids));
     if (ids.length === 0) alert("אין חשבוניות מהחודש שעבר שלא נשלחו");
-  };
-
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(false); }
   };
 
   const executeAction = async () => {
@@ -329,20 +344,35 @@ export default function InvoicesPage() {
             className="w-full h-9 rounded-lg border border-input bg-background pr-8 pl-3 text-[16px] sm:text-xs"
           />
         </div>
-        <div className="flex gap-1 flex-wrap">
-          {([["created", "חדש"], ["amount", "סכום"], ["date", "תאריך"], ["vendor", "ספק"]] as [SortKey, string][]).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => handleSort(key)}
-              className={`h-8 px-2 rounded-lg text-[11px] transition-colors ${sortKey === key ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}
+        {/* Sort dropdown + direction + filter toggle */}
+        <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 h-9 rounded-lg bg-muted/50 pr-2">
+            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="h-9 bg-transparent text-[11px] sm:text-xs text-foreground border-none cursor-pointer focus:outline-none"
+              title="מיין לפי"
             >
-              {label}{sortKey === key && <span className="mr-0.5">{sortAsc ? "↑" : "↓"}</span>}
+              <option value="created">מיין: חדש</option>
+              <option value="date">מיין: תאריך</option>
+              <option value="amount">מיין: סכום</option>
+              <option value="vendor">מיין: ספק</option>
+            </select>
+            <button onClick={() => setSortAsc((v) => !v)} className="text-muted-foreground hover:text-foreground text-sm w-5 shrink-0" title={sortAsc ? "עולה" : "יורד"}>
+              {sortAsc ? "↑" : "↓"}
             </button>
-          ))}
+          </div>
+          <button
+            onClick={() => setShowFilters((s) => !s)}
+            className={`h-9 px-2.5 rounded-lg text-[11px] sm:text-xs flex items-center gap-1 transition-colors shrink-0 ${showFilters || activeFilterCount > 0 ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}
+          >
+            <Filter className="h-3.5 w-3.5" /> סינון{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+          </button>
         </div>
       </div>
 
-      {/* Filter row: sent status + category */}
+      {/* Quick filters: sent status + last-month preset */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex gap-1 rounded-lg bg-muted/50 p-0.5">
           {([["all", "הכל"], ["unsent", "לא נשלח"], ["sent", "נשלח"]] as [SentFilter, string][]).map(([key, label]) => (
@@ -355,16 +385,6 @@ export default function InvoicesPage() {
             </button>
           ))}
         </div>
-        {categoryList.length > 0 && (
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="h-8 px-2 rounded-lg text-[11px] bg-muted/50 text-muted-foreground border-none cursor-pointer"
-          >
-            <option value="">כל הקטגוריות</option>
-            {categoryList.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-        )}
         <button
           onClick={selectLastMonthUnsent}
           className="h-8 px-2.5 rounded-lg text-[11px] bg-muted/50 text-muted-foreground hover:bg-muted transition-colors flex items-center gap-1"
@@ -373,6 +393,57 @@ export default function InvoicesPage() {
           <Calendar className="h-3 w-3" /> חודש שעבר (לא נשלח)
         </button>
       </div>
+
+      {/* Collapsible filter panel: date range, amount range + currency, category */}
+      {showFilters && (
+        <div className="rounded-xl bg-card border border-border/60 p-3 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Date range */}
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 flex items-center gap-1"><Calendar className="h-3 w-3" /> טווח תאריכים</label>
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                <span className="text-muted-foreground text-xs">—</span>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+              </div>
+            </div>
+            {/* Amount range + currency */}
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">טווח סכומים</label>
+              <div className="flex items-center gap-1.5">
+                <input type="number" inputMode="decimal" placeholder="מ-" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                <span className="text-muted-foreground text-xs">—</span>
+                <input type="number" inputMode="decimal" placeholder="עד" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                <select value={amountCurrency} onChange={(e) => setAmountCurrency(e.target.value)} className="h-9 w-[54px] shrink-0 rounded-lg border border-input bg-background text-[13px] text-center" title="מטבע">
+                  <option value="">הכל</option>
+                  <option value="ILS">₪</option>
+                  <option value="USD">$</option>
+                  <option value="EUR">€</option>
+                  <option value="GBP">£</option>
+                </select>
+              </div>
+            </div>
+            {/* Category */}
+            {categoryList.length > 0 && (
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">קטגוריה</label>
+                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]">
+                  <option value="">כל הקטגוריות</option>
+                  {categoryList.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">{filtered.length} תוצאות</span>
+            {activeFilterCount > 0 && (
+              <button onClick={clearFilters} className="text-[11px] text-red-500 hover:text-red-700 flex items-center gap-1">
+                <X className="h-3 w-3" /> נקה סינון
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Sticky bulk bar */}
       <div className="sticky top-16 z-30 bg-background/90 backdrop-blur-sm py-1.5 -mx-2 px-2 sm:-mx-4 sm:px-4 flex items-center gap-2 flex-wrap">
