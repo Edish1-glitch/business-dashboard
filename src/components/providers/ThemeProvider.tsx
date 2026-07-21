@@ -23,14 +23,12 @@ function applyTheme(theme: Theme) {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("system");
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("findash-theme") as Theme | null;
     const initial = saved || "system";
     setThemeState(initial);
     applyTheme(initial);
-    setMounted(true);
 
     // Listen for system preference changes
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -49,8 +47,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyTheme(t);
   };
 
-  if (!mounted) return <>{children}</>;
-
+  // NOTE: always render the same tree (the Provider). Previously this returned
+  // a bare fragment until `mounted`, then swapped to the Provider — changing the
+  // tree structure remounted the entire app on hydration, firing every data
+  // fetch twice. The theme is applied via document.documentElement classes in
+  // the effect above, so no gating is needed to avoid a hydration mismatch.
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
