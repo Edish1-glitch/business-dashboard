@@ -11,6 +11,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  accountantEmail String?  // saved recipient for sending invoices (רו"ח)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -18,6 +19,7 @@ model User {
   invoices    Invoice[]
   creditCards CreditCard[]
   emailAccounts EmailAccount[]
+  invoiceSends InvoiceSend[]
 }
 
 model Category {
@@ -83,6 +85,7 @@ model Invoice {
   emailAccountId  String?
   emailAccount    EmailAccount? @relation(fields: [emailAccountId], references: [id])
   expenses        Expense[]
+  sends           InvoiceSend[]
   createdAt       DateTime      @default(now())
 
   @@index([userId])
@@ -91,12 +94,28 @@ model Invoice {
   @@index([emailAccountId])
 }
 
+model InvoiceSend {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  sentTo    String   // recipient email (usually the accountant)
+  subject   String?
+  fromEmail String?  // which connected Gmail account sent it
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([userId])
+}
+
 model EmailAccount {
   id           String   @id @default(cuid())
   email        String
   provider     String   @default("gmail")
   accessToken  String?
   refreshToken String?
+  scopes       String?  // OAuth scopes granted (space-separated); used to detect gmail.send permission
   userId       String
   user         User     @relation(fields: [userId], references: [id])
   tokenExpiresAt DateTime?

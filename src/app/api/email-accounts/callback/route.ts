@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { email, accessToken, refreshToken, expiresAt } = await exchangeCodeForTokens(code);
+    const { email, accessToken, refreshToken, expiresAt, scopes } = await exchangeCodeForTokens(code);
 
     // Upsert email account
     await prisma.emailAccount.upsert({
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         accessToken,
         refreshToken,
         tokenExpiresAt: expiresAt,
+        scopes,
       },
       create: {
         email,
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
         accessToken,
         refreshToken,
         tokenExpiresAt: expiresAt,
+        scopes,
         userId,
       },
     });

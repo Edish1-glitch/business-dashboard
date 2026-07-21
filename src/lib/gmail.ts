@@ -2,8 +2,17 @@ import { google, gmail_v1 } from "googleapis";
 import { prisma } from "@/lib/db";
 import { R2_LIMITS } from "@/lib/r2";
 
-const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+];
+export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 const REDIRECT_PATH = "/api/email-accounts/callback";
+
+/** True if the stored scopes string grants permission to send email. */
+export function canSendEmail(scopes: string | null | undefined): boolean {
+  return !!scopes && scopes.split(/\s+/).includes(GMAIL_SEND_SCOPE);
+}
 
 function getOAuth2Client() {
   return new google.auth.OAuth2(
@@ -64,6 +73,7 @@ export async function exchangeCodeForTokens(code: string) {
     accessToken: tokens.access_token!,
     refreshToken: tokens.refresh_token!,
     expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+    scopes: tokens.scope || null,
   };
 }
 
@@ -555,4 +565,95 @@ export async function getAttachments(
   }
 
   return downloaded;
+}
+
+export interface OutgoingAttachment {
+  fileName: string;
+  buffer: Buffer;
+  mimeType: string; // e.g. "application/pdf"
+}
+
+/** RFC 2047 encode a header value that may contain non-ASCII (Hebrew) text. */
+function encodeHeaderWord(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]*$/.test(value)) return value; // pure ASCII, no encoding needed
+  return `=?UTF-8?B?${Buffer.from(value, "utf-8").toString("base64")}?=`;
+}
+
+/** RFC 2231 encode a filename param so Hebrew attachment names survive. */
+function encodeFilenameParam(fileName: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]*$/.test(fileName)) {
+    return `filename="${fileName.replace(/"/g, "")}"`;
+  }
+  return `filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
+
+/**
+ * Send an email (with PDF/file attachments) from a connected Gmail account.
+ * Builds a MIME multipart/mixed message and posts it via the Gmail API.
+ * Returns the sent message id.
+ */
+export async function sendGmailMessage(
+  gmail: gmail_v1.Gmail,
+  opts: {
+    from: string;
+    to: string;
+    subject: string;
+    body: string;
+    attachments: OutgoingAttachment[];
+  }
+): Promise<string> {
+  const boundary = `findash_${Buffer.from(opts.from + opts.to).toString("hex").slice(0, 16)}`;
+  const nl = "\r\n";
+
+  const headers = [
+    `From: ${opts.from}`,
+    `To: ${opts.to}`,
+    `Subject: ${encodeHeaderWord(opts.subject)}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+  ].join(nl);
+
+  const parts: string[] = [];
+
+  // Text body part (UTF-8, base64 to be safe with Hebrew)
+  parts.push(
+    [
+      `--${boundary}`,
+      "Content-Type: text/plain; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(opts.body, "utf-8").toString("base64"),
+    ].join(nl)
+  );
+
+  // Attachment parts
+  for (const att of opts.attachments) {
+    parts.push(
+      [
+        `--${boundary}`,
+        `Content-Type: ${att.mimeType}; name="${encodeHeaderWord(att.fileName)}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-Disposition: attachment; ${encodeFilenameParam(att.fileName)}`,
+        "",
+        att.buffer.toString("base64").replace(/(.{76})/g, "$1" + nl),
+      ].join(nl)
+    );
+  }
+
+  const message = headers + nl + nl + parts.join(nl) + nl + `--${boundary}--`;
+
+  const raw = Buffer.from(message, "utf-8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const res = await gmail.users.messages.send({
+    userId: "me",
+    requestBody: { raw },
+  });
+
+  return res.data.id || "";
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { Tag, User, Plus, Loader2, X, Play, Mail, RefreshCw, Trash2, Calendar, AlertTriangle, Clock, ChevronDown } from "lucide-react";
+import { Tag, User, Plus, Loader2, X, Play, Mail, RefreshCw, Trash2, Calendar, AlertTriangle, Clock, ChevronDown, Send, Check } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useSyncContext } from "@/components/providers/SyncProvider";
@@ -49,6 +49,12 @@ function SettingsPage() {
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
   const [loadingEmails, setLoadingEmails] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Accountant email + send permissions
+  const [accountantEmail, setAccountantEmail] = useState("");
+  const [savingAccountant, setSavingAccountant] = useState(false);
+  const [savedAccountant, setSavedAccountant] = useState(false);
+  const [sendPermission, setSendPermission] = useState<Record<string, boolean>>({});
   const [syncFromDate, setSyncFromDate] = useState(new Date().getFullYear() + "-01-01");
   const [syncToDate, setSyncToDate] = useState(new Date().toISOString().split("T")[0]);
   const [showOverlapWarning, setShowOverlapWarning] = useState(false);
@@ -64,6 +70,27 @@ function SettingsPage() {
       .catch(() => setLoadingEmails(false));
   };
 
+  const fetchSettings = () => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        setAccountantEmail(d.accountantEmail || "");
+        const perms: Record<string, boolean> = {};
+        for (const a of d.senderAccounts || []) perms[a.email] = a.canSend;
+        setSendPermission(perms);
+      })
+      .catch(() => {});
+  };
+
+  const saveAccountant = async () => {
+    setSavingAccountant(true);
+    setSavedAccountant(false);
+    await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountantEmail: accountantEmail.trim() }) });
+    setSavingAccountant(false);
+    setSavedAccountant(true);
+    setTimeout(() => setSavedAccountant(false), 2000);
+  };
+
   useEffect(() => {
     fetch("/api/categories")
       .then((r) => r.json())
@@ -71,6 +98,7 @@ function SettingsPage() {
       .catch(() => setLoading(false));
 
     fetchEmailAccounts();
+    fetchSettings();
   }, []);
 
   // Refresh accounts when sync finishes
@@ -86,7 +114,7 @@ function SettingsPage() {
       const url = new URL(window.location.href);
       url.searchParams.delete("gmail");
       window.history.replaceState({}, "", url.toString());
-      if (gmailStatus === "connected") fetchEmailAccounts();
+      if (gmailStatus === "connected") { fetchEmailAccounts(); fetchSettings(); }
     }
   }, [gmailStatus]);
 
@@ -260,6 +288,15 @@ function SettingsPage() {
                         ? `סנכרון אחרון: ${new Date(account.lastSyncAt).toLocaleDateString("he-IL")}`
                         : "טרם סונכרן"}
                     </p>
+                    {sendPermission[account.email] ? (
+                      <p className="text-[11px] text-emerald-600 flex items-center gap-1">
+                        <Send className="h-3 w-3" /> הרשאת שליחה פעילה
+                      </p>
+                    ) : (
+                      <a href="/api/email-accounts/connect" className="text-[11px] text-amber-600 hover:underline flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> אין הרשאת שליחה — חבר מחדש
+                      </a>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
@@ -375,6 +412,32 @@ function SettingsPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Accountant email */}
+      <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-2">
+          <Send className="h-5 w-5 text-primary" />
+          <h3 className="text-base font-semibold">מייל רואה חשבון</h3>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          כתובת ברירת המחדל לשליחת חשבוניות מעמוד &quot;חשבוניות מאושרות&quot;.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            dir="ltr"
+            value={accountantEmail}
+            onChange={(e) => setAccountantEmail(e.target.value)}
+            placeholder="accountant@example.com"
+            className="flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm text-left"
+            onKeyDown={(e) => e.key === "Enter" && saveAccountant()}
+          />
+          <Button size="sm" onClick={saveAccountant} disabled={savingAccountant} className="gap-1 shrink-0">
+            {savingAccountant ? <Loader2 className="h-4 w-4 animate-spin" /> : savedAccountant ? <Check className="h-4 w-4" /> : null}
+            {savedAccountant ? "נשמר" : "שמור"}
+          </Button>
+        </div>
       </div>
 
       {/* Categories */}
