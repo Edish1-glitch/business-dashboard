@@ -33,5 +33,12 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV NODE_ENV=production
 
+# Cap the V8 heap so it respects the 512MB container limit. Without this, V8
+# sizes its old-space heap against the host's (much larger) RAM, lets the heap
+# grow past 512MB, and the container gets OOM-killed and restarted. Set AFTER
+# the build step so the memory-hungry `next build` is not throttled.
+# Leaves headroom for native memory (Node runtime, buffers, Chromium on the PDF path).
+ENV NODE_OPTIONS="--max-old-space-size=350"
+
 # Push schema to DB then start server
 CMD ["sh", "-c", "node scripts/setup-db.mjs && npm run start"]
