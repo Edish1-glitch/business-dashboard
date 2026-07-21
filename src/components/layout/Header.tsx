@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/providers/ThemeProvider";
+import { usePendingCount } from "@/components/providers/PendingCountProvider";
 import { Sun, Moon } from "lucide-react";
 import {
   LayoutDashboard,
@@ -42,21 +43,7 @@ export function Header() {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [showThemeMenu, setShowThemeMenu] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
-
-  useEffect(() => {
-    fetch("/api/pending-count")
-      .then((r) => r.json())
-      .then((d) => setPendingCount(d.count || 0))
-      .catch(() => {});
-    const interval = setInterval(() => {
-      fetch("/api/pending-count")
-        .then((r) => r.json())
-        .then((d) => setPendingCount(d.count || 0))
-        .catch(() => {});
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  const { pendingCount } = usePendingCount();
 
   // Close menu on route change
   useEffect(() => {

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { usePendingCount } from "@/components/providers/PendingCountProvider";
 import {
   LayoutDashboard,
   FileText,
@@ -50,22 +50,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [pendingCount, setPendingCount] = useState(0);
-
-  useEffect(() => {
-    fetch("/api/pending-count")
-      .then((r) => r.json())
-      .then((d) => setPendingCount(d.count || 0))
-      .catch(() => {});
-    // Refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetch("/api/pending-count")
-        .then((r) => r.json())
-        .then((d) => setPendingCount(d.count || 0))
-        .catch(() => {});
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  const { pendingCount } = usePendingCount();
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-sidebar">
