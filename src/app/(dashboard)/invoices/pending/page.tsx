@@ -327,26 +327,39 @@ export default function PendingInvoicesPage() {
             {/* Date range */}
             <div>
               <label className="text-[11px] font-medium text-muted-foreground mb-1 flex items-center gap-1"><Calendar className="h-3 w-3" /> טווח תאריכים</label>
-              <div className="flex items-center gap-1.5">
-                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
-                <span className="text-muted-foreground text-xs">—</span>
-                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+              <div className="grid grid-cols-2 gap-1.5">
+                <div>
+                  <span className="text-[10px] text-muted-foreground mb-0.5 block">מתאריך</span>
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground mb-0.5 block">עד תאריך</span>
+                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                </div>
               </div>
             </div>
             {/* Amount range + currency */}
             <div>
               <label className="text-[11px] font-medium text-muted-foreground mb-1 block">טווח סכומים</label>
-              <div className="flex items-center gap-1.5">
-                <input type="number" inputMode="decimal" placeholder="מ-" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
-                <span className="text-muted-foreground text-xs">—</span>
-                <input type="number" inputMode="decimal" placeholder="עד" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
-                <select value={amountCurrency} onChange={(e) => setAmountCurrency(e.target.value)} className="h-9 w-[54px] shrink-0 rounded-lg border border-input bg-background text-[13px] text-center" title="מטבע">
-                  <option value="">הכל</option>
-                  <option value="ILS">₪</option>
-                  <option value="USD">$</option>
-                  <option value="EUR">€</option>
-                  <option value="GBP">£</option>
-                </select>
+              <div className="flex gap-1.5">
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] text-muted-foreground mb-0.5 block">מסכום</span>
+                  <input type="number" inputMode="decimal" placeholder="0" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] text-muted-foreground mb-0.5 block">עד סכום</span>
+                  <input type="number" inputMode="decimal" placeholder="ללא הגבלה" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+                </div>
+                <div className="w-[56px] shrink-0">
+                  <span className="text-[10px] text-muted-foreground mb-0.5 block">מטבע</span>
+                  <select value={amountCurrency} onChange={(e) => setAmountCurrency(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background text-[13px] text-center">
+                    <option value="">הכל</option>
+                    <option value="ILS">₪</option>
+                    <option value="USD">$</option>
+                    <option value="EUR">€</option>
+                    <option value="GBP">£</option>
+                  </select>
+                </div>
               </div>
             </div>
             {/* Category */}
