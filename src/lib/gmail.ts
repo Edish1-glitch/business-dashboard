@@ -1,18 +1,13 @@
 import { google, gmail_v1 } from "googleapis";
 import { prisma } from "@/lib/db";
 import { R2_LIMITS } from "@/lib/r2";
+import { GMAIL_SEND_SCOPE, GMAIL_READONLY_SCOPE, canSendEmail } from "@/lib/gmail-scopes";
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.send",
-];
-export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+// Re-export the lightweight scope helpers so existing importers keep working.
+export { GMAIL_SEND_SCOPE, canSendEmail };
+
+const SCOPES = [GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE];
 const REDIRECT_PATH = "/api/email-accounts/callback";
-
-/** True if the stored scopes string grants permission to send email. */
-export function canSendEmail(scopes: string | null | undefined): boolean {
-  return !!scopes && scopes.split(/\s+/).includes(GMAIL_SEND_SCOPE);
-}
 
 function getOAuth2Client() {
   return new google.auth.OAuth2(

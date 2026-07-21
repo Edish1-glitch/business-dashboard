@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/api-auth";
-import { canSendEmail } from "@/lib/gmail";
+import { canSendEmail } from "@/lib/gmail-scopes";
 
 /**
  * GET /api/settings
