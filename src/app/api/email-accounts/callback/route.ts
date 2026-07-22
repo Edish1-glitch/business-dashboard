@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { validateState, exchangeCodeForTokens } from "@/lib/gmail";
+import { encryptToken } from "@/lib/crypto";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -25,21 +26,23 @@ export async function GET(request: NextRequest) {
 
   try {
     const { email, accessToken, refreshToken, expiresAt, scopes } = await exchangeCodeForTokens(code);
+    const encAccess = encryptToken(accessToken);
+    const encRefresh = encryptToken(refreshToken);
 
-    // Upsert email account
+    // Upsert email account (tokens encrypted at rest)
     await prisma.emailAccount.upsert({
       where: { email_userId: { email, userId } },
       update: {
-        accessToken,
-        refreshToken,
+        accessToken: encAccess,
+        refreshToken: encRefresh,
         tokenExpiresAt: expiresAt,
         scopes,
       },
       create: {
         email,
         provider: "gmail",
-        accessToken,
-        refreshToken,
+        accessToken: encAccess,
+        refreshToken: encRefresh,
         tokenExpiresAt: expiresAt,
         scopes,
         userId,

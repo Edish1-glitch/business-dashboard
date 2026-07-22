@@ -2,6 +2,7 @@ import { google, gmail_v1 } from "googleapis";
 import { prisma } from "@/lib/db";
 import { R2_LIMITS } from "@/lib/r2";
 import { GMAIL_SEND_SCOPE, GMAIL_READONLY_SCOPE, canSendEmail } from "@/lib/gmail-scopes";
+import { decryptToken, encryptToken } from "@/lib/crypto";
 
 // Re-export the lightweight scope helpers so existing importers keep working.
 export { GMAIL_SEND_SCOPE, canSendEmail };
@@ -79,30 +80,35 @@ export async function exchangeCodeForTokens(code: string) {
 export async function getGmailClient(
   emailAccount: { id: string; accessToken: string | null; refreshToken: string | null; tokenExpiresAt: Date | null }
 ): Promise<gmail_v1.Gmail> {
-  if (!emailAccount.accessToken || !emailAccount.refreshToken) {
+  // Tokens are encrypted at rest; decrypt before use (legacy plaintext passes through).
+  const accessToken = decryptToken(emailAccount.accessToken);
+  const refreshToken = decryptToken(emailAccount.refreshToken);
+  // Only the refresh token is essential — a missing/unreadable access token can
+  // be regenerated from it (resilient to key rotation corrupting the access token).
+  if (!refreshToken) {
     throw new Error("חשבון אימייל לא מחובר כראוי");
   }
 
   const oauth2Client = getOAuth2Client();
   oauth2Client.setCredentials({
-    access_token: emailAccount.accessToken,
-    refresh_token: emailAccount.refreshToken,
+    access_token: accessToken || undefined,
+    refresh_token: refreshToken,
     expiry_date: emailAccount.tokenExpiresAt?.getTime(),
   });
 
-  // Auto-refresh if expired or about to expire (5 min buffer)
+  // Refresh when the access token is missing/unreadable or about to expire (5 min buffer)
   const expiresAt = emailAccount.tokenExpiresAt?.getTime() || 0;
-  if (Date.now() > expiresAt - 5 * 60 * 1000) {
+  if (!accessToken || Date.now() > expiresAt - 5 * 60 * 1000) {
     const { credentials } = await oauth2Client.refreshAccessToken();
     oauth2Client.setCredentials(credentials);
 
-    // Update tokens in DB
+    // Re-encrypt tokens before storing
     await prisma.emailAccount.update({
       where: { id: emailAccount.id },
       data: {
-        accessToken: credentials.access_token,
+        accessToken: credentials.access_token ? encryptToken(credentials.access_token) : undefined,
         tokenExpiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
-        ...(credentials.refresh_token && { refreshToken: credentials.refresh_token }),
+        ...(credentials.refresh_token && { refreshToken: encryptToken(credentials.refresh_token) }),
       },
     });
   }
