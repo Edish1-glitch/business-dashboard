@@ -9,6 +9,7 @@ npm run dev                    # Dev server (Turbopack). Runs React StrictMode �
 npm run build                  # Production build (also runs ESLint; lint errors fail the build)
 npm start                      # Production server (next start) — use this to test memory / double-fetch behavior
 npm run lint                   # ESLint
+npm test                       # Unit tests (vitest, tests/unit/**) — pure logic, no DB/network
 npx playwright test            # E2E tests (desktop/mobile/tablet)
 npx playwright test --grep "Mobile"
 npx prisma generate            # Regenerate client after schema changes (client → src/generated/prisma, gitignored)
@@ -84,6 +85,13 @@ Ingest pipeline: `src/lib/pdf/split.ts` (pdf-lib, split by page) → `extract.ts
 ### Auth & sidebar
 
 NextAuth v4 Google OAuth; session callback auto-creates the user. `src/lib/auth.ts` (config), `src/lib/api-auth.ts` (`getAuthUser()` for routes). `src/middleware.ts` redirects unauthenticated requests to `/login` (allowlists `/api/auth`, `/login`, `/api/email-accounts/callback`, `/tour`). Sidebar/Header nav items use an `exact` flag so a parent route (`/invoices`) doesn't stay highlighted on a child (`/invoices/pending`).
+
+### Security invariants (do not regress)
+
+- **Multi-tenant: every route that touches user data MUST scope by `userId`.** Either query `where: { …, userId: user.id }` or fetch then check `record.userId === user.id`. Anyone can register (open Google sign-up), so a missing check = IDOR. (This bit the download/preview/delete/approve invoice routes — now fixed.)
+- **OAuth tokens are encrypted at rest** via `lib/crypto` (AES-256-GCM). The key derives from `GOOGLE_CLIENT_SECRET` (identical across local+Render, so both decrypt). Read/write tokens ONLY through `lib/gmail.ts` (`getGmailClient` decrypts, callback/refresh encrypt); never select them into an API response. `decryptToken` passes legacy plaintext through.
+- **Throttle abuse-prone mutations.** `send-email` uses `lib/rate-limit` (10/min per user) so a session can't spam through the user's Gmail.
+- Hardening headers live in `next.config.ts`. A full CSP is still TODO (must be tested against Next inline scripts / Google OAuth / avatars / R2).
 
 ## Deployment & runtime constraints
 
