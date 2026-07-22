@@ -63,6 +63,17 @@ test.describe("API Protection", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  // Regression guard for the IDOR fix: per-invoice file routes must be gated.
+  test("per-invoice file/mutation routes require auth", async ({ page }) => {
+    for (const path of [
+      "/api/invoices/any-id/download",
+      "/api/invoices/any-id/preview",
+    ]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/login/);
+    }
+  });
+
   test("auth providers endpoint works", async ({ page }) => {
     const res = await page.request.get("/api/auth/providers");
     expect(res.status()).toBe(200);

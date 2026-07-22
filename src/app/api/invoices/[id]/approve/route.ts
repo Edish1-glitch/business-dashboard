@@ -17,7 +17,7 @@ export async function POST(
     include: { category: true },
   });
 
-  if (!invoice) {
+  if (!invoice || invoice.userId !== user.id) {
     return NextResponse.json({ error: "חשבונית לא נמצאה" }, { status: 404 });
   }
 

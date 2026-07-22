@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getAuthUser } from "@/lib/api-auth";
 import { readFile } from "fs/promises";
 import { downloadFromR2 } from "@/lib/r2";
 import { execFile } from "child_process";
@@ -31,10 +32,12 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { user, error } = await getAuthUser();
+  if (error) return error;
   const { id } = await params;
 
   const invoice = await prisma.invoice.findUnique({ where: { id } });
-  if (!invoice) {
+  if (!invoice || invoice.userId !== user.id) {
     return NextResponse.json({ error: "לא נמצא" }, { status: 404 });
   }
 
