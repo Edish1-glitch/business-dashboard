@@ -132,6 +132,26 @@ describe("detectCategory", () => {
   it("falls back to 'אחר' for unknown text", () => {
     expect(detectCategory("zzz unknown vendor qqq")).toBe("אחר");
   });
+
+  // Real bug: short Latin keyword 'ten' (fuel brand) matched inside common words
+  // like 'content', turning many invoices into דלק.
+  it("does not match a keyword inside a bigger word ('ten' in 'content')", () => {
+    expect(detectCategory("Content management and settings")).not.toBe("דלק");
+  });
+
+  it("categorizes a Facebook/Meta subscription as תוכנה, not דלק/שיווק", () => {
+    const text = "Meta Verified\nRecurring monthly payment\nTo cancel, go to Subscriptions settings.\nFacebook";
+    expect(detectCategory(text)).toBe("תוכנה");
+  });
+
+  it("still categorizes actual ad spend as שיווק ופרסום", () => {
+    expect(detectCategory("Facebook Ads — campaign receipt")).toBe("שיווק ופרסום");
+    expect(detectCategory("Google Ads invoice")).toBe("שיווק ופרסום");
+  });
+
+  it("categorizes Google Cloud as תוכנה, not שיווק", () => {
+    expect(detectCategory("Google Cloud Platform - invoice")).toBe("תוכנה");
+  });
 });
 
 describe("isNegativeInvoice (things that are NOT expenses)", () => {

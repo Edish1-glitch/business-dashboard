@@ -13,7 +13,7 @@ export interface InvoiceData {
 
 // Category detection keywords - Hebrew + English
 const categoryKeywords: Record<string, string[]> = {
-  דלק: ["דלק", "תדלוק", "סונול", "פז", "דור אלון", "yellow", "ילוו", "ten", "טן", "אלון", "בנזין", "fuel", "gas station", "gasoline"],
+  דלק: ["דלק", "תדלוק", "סונול", "פז", "דור אלון", "yellow", "ילוו", "טן", "אלון", "בנזין", "fuel", "gas station", "gasoline"],
   סופר: ["סופר", "רמי לוי", "שופרסל", "מגא", "יוחננוף", "חצי חינם", "ויקטורי", "אושר עד", "טיב טעם", "grocery", "supermarket"],
   מסעדות: ["מסעדה", "קפה", "פיצה", "המבורגר", "סושי", "מסעדת", "בית קפה", "ארוחה", "restaurant", "cafe", "coffee", "food", "dining", "uber eats", "wolt", "doordash"],
   תחבורה: ["חניה", "חנייה", "רכבת", "אוטובוס", "מונית", "גט", "אגד", "דן", "רכב", "uber", "lyft", "taxi", "parking", "transit"],
@@ -48,7 +48,15 @@ export function detectCategory(text: string): string {
 
   for (const [category, keywords] of Object.entries(categoryKeywords)) {
     for (const keyword of keywords) {
-      if (lowerText.includes(keyword.toLowerCase())) {
+      const kw = keyword.toLowerCase();
+      // Latin keywords must start at a word boundary so short ones (e.g. "ten")
+      // don't match inside bigger words ("con-ten-t"). Hebrew keeps substring
+      // matching (JS \b doesn't apply to Hebrew letters).
+      const isLatin = /^[\x00-\x7F]+$/.test(kw);
+      if (isLatin) {
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (new RegExp(`\\b${escaped}`).test(lowerText)) return category;
+      } else if (lowerText.includes(kw)) {
         return category;
       }
     }
