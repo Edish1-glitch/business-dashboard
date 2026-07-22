@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Onboarding } from "@/components/Onboarding";
 import { SyncFloatingWidget } from "@/components/SyncFloatingWidget";
+import { UploadFloatingWidget } from "@/components/UploadFloatingWidget";
 import { Toaster } from "sonner";
 
 export default function DashboardLayout({
@@ -17,6 +18,7 @@ export default function DashboardLayout({
         <main className="flex-1 p-2 sm:p-4 md:p-6 lg:p-8">{children}</main>
       </div>
       <SyncFloatingWidget />
+      <UploadFloatingWidget />
       <Onboarding />
       <Toaster position="top-center" dir="rtl" richColors />
     </>

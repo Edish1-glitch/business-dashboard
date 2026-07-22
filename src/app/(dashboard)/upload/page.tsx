@@ -16,26 +16,10 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface InvoiceResult {
-  id: string;
-  page: number;
-  fileName: string;
-  sourceFile: string;
-  vendor: string | null;
-  amount: number | null;
-  date: string | null;
-  category: string | null;
-  creditCardLast4: string | null;
-}
-
+import { useUpload } from "@/components/providers/UploadProvider";
 
 export default function UploadPage() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState("");
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [results, setResults] = useState<InvoiceResult[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { uploadState, startUpload } = useUpload();
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,78 +31,18 @@ export default function UploadPage() {
         ext.endsWith(".png") || ext.endsWith(".webp") || ext.endsWith(".heic");
     });
     setSelectedFiles((prev) => [...prev, ...validFiles]);
-    setError(null);
   }, []);
 
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const uploadFiles = async () => {
+  // Hand the files to the global UploadProvider so processing survives leaving
+  // this page, then clear the local selection.
+  const handleUpload = () => {
     if (selectedFiles.length === 0) return;
-
-    setIsProcessing(true);
-    setError(null);
-    setResults(null);
-    setProgress(`מעבד ${selectedFiles.length} קבצים...`);
-
-    try {
-      const formData = new FormData();
-      selectedFiles.forEach((file) => formData.append("files", file));
-      setProgressPercent(0);
-
-      const response = await fetch("/api/upload-invoices", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(data.error || "שגיאה בעיבוד הקבצים");
-        return;
-      }
-
-      // Read streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let finalData = null;
-
-      if (reader) {
-        let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const msg = JSON.parse(line);
-              if (msg.type === "progress") {
-                setProgress(msg.message);
-                setProgressPercent(msg.total > 0 ? (msg.current / msg.total) * 100 : 0);
-              } else if (msg.type === "done") {
-                finalData = msg;
-              }
-            } catch { /* ignore parse errors */ }
-          }
-        }
-      }
-
-      if (finalData) {
-        setResults(finalData.invoices);
-        setSelectedFiles([]);
-      }
-    } catch {
-      setError("שגיאה בהעלאת הקבצים");
-    } finally {
-      setIsProcessing(false);
-      setProgress("");
-      setProgressPercent(0);
-    }
+    startUpload(selectedFiles);
+    setSelectedFiles([]);
   };
 
   const handleDrop = useCallback(
@@ -150,7 +74,7 @@ export default function UploadPage() {
           isDragging
             ? "border-primary bg-primary/5 scale-[1.01]"
             : "border-border hover:border-primary/50 hover:bg-muted/30"
-        } ${isProcessing ? "pointer-events-none opacity-60" : ""}`}
+        } ${uploadState.isUploading ? "pointer-events-none opacity-60" : ""}`}
         style={{ touchAction: "manipulation" }}
       >
         <input
@@ -190,8 +114,8 @@ export default function UploadPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">{selectedFiles.length} קבצים נבחרו</p>
-            <Button onClick={uploadFiles} disabled={isProcessing} className="gap-2">
-              {isProcessing ? (
+            <Button onClick={handleUpload} disabled={uploadState.isUploading} className="gap-2">
+              {uploadState.isUploading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   מעבד...
@@ -232,37 +156,37 @@ export default function UploadPage() {
       )}
 
       {/* Progress bar */}
-      {isProcessing && (
+      {uploadState.isUploading && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{progress}</span>
-            <span className="font-medium">{Math.round(progressPercent)}%</span>
+            <span className="text-muted-foreground">{uploadState.progress}</span>
+            <span className="font-medium">{Math.round(uploadState.percent)}%</span>
           </div>
           <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
+              style={{ width: `${uploadState.percent}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* Error */}
-      {error && (
+      {/* Error (result set but no invoices = failure) */}
+      {!uploadState.isUploading && uploadState.result && !uploadState.invoices && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">
           <AlertCircle className="h-5 w-5 shrink-0" />
-          <p className="text-sm">{error}</p>
+          <p className="text-sm">{uploadState.result}</p>
         </div>
       )}
 
       {/* Results */}
-      {results && (
+      {!uploadState.isUploading && uploadState.invoices && uploadState.invoices.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
             <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
             <div>
               <p className="font-semibold text-emerald-900">
-                {results.length} חשבוניות עובדו בהצלחה
+                {uploadState.invoices.length} חשבוניות עובדו בהצלחה
               </p>
               <p className="text-sm text-emerald-700">
                 עבור ל<a href="/invoices/pending" className="underline font-medium">ממתינות לאישור</a> כדי לבדוק ולאשר
@@ -271,7 +195,7 @@ export default function UploadPage() {
           </div>
 
           <div className="grid gap-2">
-            {results.map((inv) => (
+            {uploadState.invoices.map((inv) => (
               <div key={inv.id} className="rounded-xl bg-card border border-border/50 p-3 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">

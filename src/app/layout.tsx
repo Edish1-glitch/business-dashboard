@@ -5,6 +5,7 @@ import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { SyncProvider } from "@/components/providers/SyncProvider";
 import { PendingCountProvider } from "@/components/providers/PendingCountProvider";
+import { UploadProvider } from "@/components/providers/UploadProvider";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -37,9 +38,11 @@ export default function RootLayout({
         <SessionProvider>
           <ThemeProvider>
             <SyncProvider>
-              <PendingCountProvider>
-                {children}
-              </PendingCountProvider>
+              <UploadProvider>
+                <PendingCountProvider>
+                  {children}
+                </PendingCountProvider>
+              </UploadProvider>
             </SyncProvider>
           </ThemeProvider>
         </SessionProvider>
