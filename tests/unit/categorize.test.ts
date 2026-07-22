@@ -56,6 +56,12 @@ describe("extractDate", () => {
     expect(ymd(extractDate("Date: 2025-01-15"))).toEqual([2025, 1, 15]);
   });
 
+  it("parses YYYY/MM/DD with slashes or dots (year-first is unambiguous)", () => {
+    // Real bug: '2025/02/08' was read as 2008 because ISO parsing only handled dashes.
+    expect(ymd(extractDate("Date subscribed 2025/02/08"))).toEqual([2025, 2, 8]);
+    expect(ymd(extractDate("2025.02.08"))).toEqual([2025, 2, 8]);
+  });
+
   it("parses DD/MM/YYYY when the first number > 12 (Israeli)", () => {
     expect(ymd(extractDate("15/03/2025"))).toEqual([2025, 3, 15]);
   });

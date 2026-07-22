@@ -134,8 +134,9 @@ export function extractAmount(text: string): { amount: number; currency: string 
  * Supports DD/MM/YYYY (Israeli), MM/DD/YYYY (US), YYYY-MM-DD (ISO), and text months.
  */
 export function extractDate(text: string): Date | null {
-  // ISO format: 2025-01-15 (unambiguous, try first)
-  const isoMatch = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  // Year-first (ISO-style): 2025-01-15, 2025/01/15, 2025.01.15 — unambiguous, try first.
+  // (Handling only dashes here meant '2025/02/08' fell through and was misread as 2008.)
+  const isoMatch = text.match(/(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
   if (isoMatch) {
     const year = parseInt(isoMatch[1]);
     const month = parseInt(isoMatch[2]);
