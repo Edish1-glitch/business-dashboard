@@ -138,8 +138,25 @@ describe("isNegativeInvoice (things that are NOT expenses)", () => {
     expect(isNegativeInvoice(text)).toBe(true);
   });
 
+  // Real-world false positives: employment/work agreements were pulled from
+  // email and shown as invoices with garbage amounts. They must be rejected.
+  it.each([
+    "הסכם עבודה בין החברה לבין העובד",
+    "חוזה עבודה אישי",
+    "הסכם העסקה - תנאי שכר",
+    "Employment Agreement between the parties",
+    "Offer Letter — terms of employment",
+  ])("flags work/employment agreement as negative: %s", (text) => {
+    expect(isNegativeInvoice(text)).toBe(true);
+  });
+
   it("does not flag a normal invoice", () => {
     expect(isNegativeInvoice('חשבונית מס 12345 סה"כ 100')).toBe(false);
+  });
+
+  it("does not over-reject an invoice that merely mentions an employee", () => {
+    // 'עובד' alone must not trigger rejection — only actual agreement phrasing
+    expect(isNegativeInvoice('חשבונית עבור שירותי עובד קבלן, סה"כ 500')).toBe(false);
   });
 });
 

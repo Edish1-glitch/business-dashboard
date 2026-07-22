@@ -324,6 +324,15 @@ const NEGATIVE_PATTERNS = [
   /(?:פוליס[הת]|תביע[הת])\s+(?:ביטוח|רכב|חיים|בריאות)/,
   /(?:medical|accident)\s+(?:report|form|certificate)/i,
   /(?:insurance)\s+(?:claim|policy|terms|conditions)/i,
+  // Employment / work agreements (contracts, not invoices)
+  /הסכם\s+עבוד[הת]/,
+  /חוזה\s+עבוד[הת]/,
+  /הסכם\s+העסק[הת]/,
+  /חוזה\s+העסק[הת]/,
+  /תנאי\s+העסק[הת]/,
+  /employment\s+(?:agreement|contract)/i,
+  /offer\s+letter/i,
+  /terms\s+of\s+employment/i,
 ];
 
 const INVOICE_SIGNALS_HE = [

@@ -333,7 +333,9 @@ function shouldSkipFile(fileName: string): boolean {
   const skipPatterns = [
     // ===== Legal / Terms / Agreements (Hebrew) =====
     /תנאי.*(שימוש|הצטרפות|שירות|תובלה)/,
-    /הסכם.*(הלוואה|שירות|הצטרפות)/,
+    /הסכם.*(הלוואה|שירות|הצטרפות|עבודה|העסקה)/,
+    /חוזה.*(עבודה|העסקה)/,
+    /employment.*(agreement|contract)/i,
     /מדיניות.*פרטיות/,
     /נספח/,
     /טופס.?101/,
