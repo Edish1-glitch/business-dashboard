@@ -50,10 +50,15 @@ interface Invoice {
 
 type SortKey = "date" | "amount" | "vendor" | "created";
 
+// Stale-while-revalidate cache (module scope → persists across client-side
+// navigation). Revisiting the page shows the last data instantly instead of a
+// blank reload/spinner; it's refreshed in the background on each mount.
+let pendingCache: { invoices: Invoice[]; categories: Category[] } | null = null;
+
 export default function PendingInvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [invoices, setInvoices] = useState<Invoice[]>(pendingCache?.invoices ?? []);
+  const [categories, setCategories] = useState<Category[]>(pendingCache?.categories ?? []);
+  const [loading, setLoading] = useState(pendingCache === null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Invoice>>({});
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -80,8 +85,8 @@ export default function PendingInvoicesPage() {
   const [amountMax, setAmountMax] = useState("");
   const [amountCurrency, setAmountCurrency] = useState("");
 
+  // Revalidate in the background; only the first-ever load shows a spinner (loading init).
   const fetchData = useCallback(async () => {
-    setLoading(true);
     try {
       const [invRes, catRes] = await Promise.all([
         fetch("/api/invoices?status=pending"),
@@ -89,13 +94,19 @@ export default function PendingInvoicesPage() {
       ]);
       const invData = await invRes.json();
       const catData = await catRes.json();
-      setInvoices(invData.invoices || []);
-      setCategories(catData.categories || []);
-    } catch { setInvoices([]); }
-    finally { setLoading(false); setSelected(new Set()); }
+      const inv = invData.invoices || [];
+      const cat = catData.categories || [];
+      setInvoices(inv);
+      setCategories(cat);
+      pendingCache = { invoices: inv, categories: cat };
+    } catch { if (pendingCache === null) setInvoices([]); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Mirror optimistic (approve/delete/edit) changes into the cache for the next visit.
+  useEffect(() => { pendingCache = { invoices, categories }; }, [invoices, categories]);
 
   const emailAccounts = useMemo(() => {
     const set = new Set<string>();
