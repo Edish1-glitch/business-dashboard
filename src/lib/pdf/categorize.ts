@@ -17,13 +17,17 @@ const categoryKeywords: Record<string, string[]> = {
   סופר: ["סופר", "רמי לוי", "שופרסל", "מגא", "יוחננוף", "חצי חינם", "ויקטורי", "אושר עד", "טיב טעם", "grocery", "supermarket"],
   מסעדות: ["מסעדה", "קפה", "פיצה", "המבורגר", "סושי", "מסעדת", "בית קפה", "ארוחה", "restaurant", "cafe", "coffee", "food", "dining", "uber eats", "wolt", "doordash"],
   תחבורה: ["חניה", "חנייה", "רכבת", "אוטובוס", "מונית", "גט", "אגד", "דן", "רכב", "uber", "lyft", "taxi", "parking", "transit"],
-  ביטוח: ["ביטוח", "פוליסה", "הראל", "מגדל", "כלל", "הפניקס", "מנורה", "insurance", "policy", "coverage"],
-  תקשורת: ["סלקום", "פלאפון", "הוט", "פרטנר", "012", "013", "בזק", "yes", "אינטרנט", "סלולר", "internet", "mobile", "cellular", "phone", "telecom", "broadband"],
+  // Dropped generic "policy" (privacy-policy footers) and bare "כלל" (common Hebrew word) -> "כלל ביטוח".
+  ביטוח: ["ביטוח", "פוליסה", "הראל", "מגדל", "כלל ביטוח", "הפניקס", "מנורה", "insurance"],
+  // Dropped bare "yes" (very common English word), "phone" (footer contact lines) and "012"/"013" (bare numbers).
+  תקשורת: ["סלקום", "פלאפון", "הוט", "פרטנר", "בזק", "אינטרנט", "סלולר", "internet", "mobile", "cellular", "telecom", "broadband"],
   "חשמל ומים": ["חשמל", "חברת חשמל", "מים", "מקורות", "עירייה", "ארנונה", "electricity", "water", "utility", "utilities"],
   שכירות: ["שכירות", "שכ\"ד", "דמי שכירות", "rent", "lease", "rental"],
-  "ציוד משרדי": ["משרדי", "ציוד", "מחשב", "מדפסת", "נייר", "דיו", "office supplies", "equipment", "printer", "computer"],
+  // "דיו" (ink) removed — it's the start of common words (דיווח/דיון/דיוק); use specific "מחסנית"/"טונר".
+  "ציוד משרדי": ["משרדי", "ציוד", "מחשב", "מדפסת", "נייר", "מחסנית", "טונר", "office supplies", "equipment", "printer", "computer", "toner"],
   "שיווק ופרסום": ["פרסום", "שיווק", "גוגל", "פייסבוק", "מודעה", "קמפיין", "advertising", "marketing", "google ads", "facebook ads", "campaign", "meta ads"],
-  מיסים: ["מע\"מ", "מס הכנסה", "ביטוח לאומי", "מס", "ניכוי", "tax", "vat", "levy"],
+  // Only real tax-authority signals — NOT generic "tax"/"מע\"מ"/"מס" which appear in every invoice's totals.
+  מיסים: ["מס הכנסה", "רשות המסים", "ביטוח לאומי", "ארנונה", "מקדמות מס"],
   תוכנה: [
     "software", "saas", "subscription", "license", "cloud", "hosting",
     "anthropic", "claude", "openai", "chatgpt", "github", "copilot",
@@ -37,6 +41,7 @@ const categoryKeywords: Record<string, string[]> = {
     "mongodb", "supabase", "planetscale", "neon",
     "cloudflare", "namecheap", "godaddy", "domain",
     "app store", "play store",
+    "youtube", "google one", "spotify", "icloud", "microsoft 365", "office 365",
   ],
 };
 
@@ -49,16 +54,14 @@ export function detectCategory(text: string): string {
   for (const [category, keywords] of Object.entries(categoryKeywords)) {
     for (const keyword of keywords) {
       const kw = keyword.toLowerCase();
-      // Latin keywords must start at a word boundary so short ones (e.g. "ten")
-      // don't match inside bigger words ("con-ten-t"). Hebrew keeps substring
-      // matching (JS \b doesn't apply to Hebrew letters).
-      const isLatin = /^[\x00-\x7F]+$/.test(kw);
-      if (isLatin) {
-        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        if (new RegExp(`\\b${escaped}`).test(lowerText)) return category;
-      } else if (lowerText.includes(kw)) {
-        return category;
-      }
+      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Match at a word start, Hebrew-aware. The keyword must sit at a real word
+      // boundary (not embedded: no "ten" in "content", no "מים" in "תשלומים"),
+      // but may carry ONE Hebrew clitic prefix from בכלמ ה ו ש — so "רמי לוי"
+      // still matches inside "ברמי לוי", while "מים" does NOT match "ימים"
+      // (days: "י" is not a prefix letter) or "סמים". Trailing suffixes are
+      // allowed, so "subscription" still matches "subscriptions".
+      if (new RegExp(`(?<![a-z0-9א-ת])[בהוכלמש]?${escaped}`).test(lowerText)) return category;
     }
   }
 

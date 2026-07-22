@@ -152,6 +152,41 @@ describe("detectCategory", () => {
   it("categorizes Google Cloud as תוכנה, not שיווק", () => {
     expect(detectCategory("Google Cloud Platform - invoice")).toBe("תוכנה");
   });
+
+  // Generic boilerplate words that appear in almost every invoice/email must not
+  // steal the category from the real signal.
+  it("a subscription full of Tax/policy boilerplate is תוכנה, not מיסים/ביטוח", () => {
+    const text = "Meta Verified\nRecurring monthly payment\nSubtotal ₪42.89\nTax ₪0.00\nTotal ₪42.89\nTo cancel, go to Subscriptions settings.\nprivacy policy\nFacebook";
+    expect(detectCategory(text)).toBe("תוכנה");
+  });
+
+  it("does not turn any email with the word 'yes' into תקשורת", () => {
+    expect(detectCategory("Yes, your order is confirmed. Thanks!")).not.toBe("תקשורת");
+  });
+
+  it("does not turn the common Hebrew word 'כלל' into ביטוח", () => {
+    expect(detectCategory("סה\"כ כולל הכל - זהו סכום כללי")).not.toBe("ביטוח");
+  });
+
+  // ...but real tax-authority and insurance documents still classify correctly.
+  it("still detects a real tax-authority invoice as מיסים", () => {
+    expect(detectCategory("רשות המסים - מקדמות מס הכנסה")).toBe("מיסים");
+  });
+
+  it("still detects a real insurance policy as ביטוח", () => {
+    expect(detectCategory("הראל חברה לביטוח - פוליסת ביטוח בריאות")).toBe("ביטוח");
+  });
+
+  // Real receipts that used to land in ביטוח/אחר: consumer digital subscriptions.
+  it("classifies YouTube Premium / Google One receipts as תוכנה", () => {
+    expect(detectCategory("הקבלה שלך עבור התשלום אל Google Payment Limited - YouTube Premium")).toBe("תוכנה");
+    expect(detectCategory("התשלום ששלחת עבר בהצלחה - 100 GB (Google One)")).toBe("תוכנה");
+  });
+
+  // The Hebrew clitic-prefix boundary must not let "מים" match "ימים"/"תשלומים".
+  it("does not classify text about ימים/תשלומים as חשמל ומים", () => {
+    expect(detectCategory("החזר בתוך 180 ימים מיום העסקה, סכום התשלומים")).not.toBe("חשמל ומים");
+  });
 });
 
 describe("isNegativeInvoice (things that are NOT expenses)", () => {
