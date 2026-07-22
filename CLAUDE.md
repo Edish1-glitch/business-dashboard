@@ -5,112 +5,100 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev                    # Start dev server (Turbopack)
-npm run build                  # Production build
+npm run dev                    # Dev server (Turbopack). Runs React StrictMode → effects double-invoke.
+npm run build                  # Production build (also runs ESLint; lint errors fail the build)
+npm start                      # Production server (next start) — use this to test memory / double-fetch behavior
 npm run lint                   # ESLint
-npx playwright test            # Run all E2E tests (18 tests: desktop/mobile/tablet)
-npx playwright test --grep "Mobile"  # Run specific test group
-npx prisma generate           # Regenerate Prisma client (after schema changes)
-npx prisma db push            # Push schema to running DB
-DATABASE_URL="postgresql://findash:findash_dev_password@localhost:5432/findash?schema=public" npx tsx prisma/seed.ts  # Seed categories
-brew services start postgresql@16  # Start local PostgreSQL (native, not Docker)
+npx playwright test            # E2E tests (desktop/mobile/tablet)
+npx playwright test --grep "Mobile"
+npx prisma generate            # Regenerate client after schema changes (client → src/generated/prisma, gitignored)
+npx prisma db push             # Push schema to the DB in .env (see DB note below)
 ```
+
+`.env` `DATABASE_URL` points at a **Neon cloud Postgres (EU)** — dev and production share the *same* DB, so schema changes are immediately live everywhere. Prefer **additive-only** schema changes (new nullable columns / new tables) so deployed old code keeps working.
+
+Standalone `tsx` scripts don't auto-load `.env` — run them as:
+`set -a && . ./.env && set +a && npx tsx script.ts`
 
 ## Architecture
 
-**Stack**: Next.js 16 (App Router) + TypeScript, Tailwind CSS v4, PostgreSQL + Prisma 7, Heebo font (Hebrew)
+**Stack**: Next.js 16 (App Router) + TypeScript, Tailwind v4, Prisma 7 + Postgres (Neon), NextAuth v4 (Google OAuth), Cloudflare R2, puppeteer-core + system Chromium, tesseract/poppler OCR. Heebo font, RTL, Hebrew UI.
 
-### Critical: Non-Obvious Patterns
+### Critical non-obvious patterns
 
-**Prisma 7 requires an adapter** — you cannot write `new PrismaClient()`. Must use:
+**Prisma 7 needs an adapter** — never `new PrismaClient()` alone:
 ```ts
 import { PrismaPg } from "@prisma/adapter-pg";
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 ```
-See `src/lib/db.ts` for the singleton pattern. Generated client lives at `src/generated/prisma/` (gitignored).
+See `src/lib/db.ts` (singleton).
 
-**shadcn/ui uses @base-ui/react, NOT Radix UI.** There is no `asChild` prop. Use `render` prop instead. Components use `data-slot="..."` attributes. Always check the actual component source in `src/components/ui/` before using patterns from docs or training data.
+**shadcn/ui here uses @base-ui/react, NOT Radix.** No `asChild` — use the `render` prop; components carry `data-slot="..."`. Check the real source in `src/components/ui/` before copying patterns from docs/training.
 
-**Mobile menu uses HTML checkbox + CSS `peer-checked:`** — not React state. This was required for Safari iOS touch compatibility. The `<label htmlFor>` toggles a hidden checkbox, and CSS `peer-checked:` controls sidebar visibility. See `src/components/layout/Header.tsx`.
+**Mobile menu = HTML checkbox + CSS `peer-checked:`**, not React state (Safari iOS touch compat). See `Header.tsx`.
 
-**RTL layout** — `dir="rtl"` + `lang="he"` on `<html>`. Sidebar is on the right (`md:mr-64` on content). All UI text is Hebrew.
+**RTL**: `dir="rtl" lang="he"` on `<html>`; sidebar on the right (`md:mr-64` on content). All UI text Hebrew.
 
-**Dynamic route params are Promises** in Next.js 16:
-```ts
-{ params }: { params: Promise<{ id: string }> }
-const { id } = await params;
-```
+**Dynamic route params are Promises**: `{ params }: { params: Promise<{ id: string }> }` → `const { id } = await params;`
 
-**Tailwind v4** uses `@theme inline` in CSS with OkLCH color space. See `src/app/globals.css`.
+**Tailwind v4** — `@theme inline` + OkLCH in `src/app/globals.css`.
 
-### File Storage
+**Never round monetary amounts** — show the exact value (₪47.65, not ₪48) in summaries, per-item displays, and PDF filenames. Use `toLocaleString(..., {maximumFractionDigits: 2})` / `Math.round(x*100)/100`, never `maximumFractionDigits: 0` on a real amount.
 
-Files are stored in **Cloudflare R2** (S3-compatible). When R2 env vars are not set, falls back to base64 in DB.
-- `src/lib/r2.ts` — R2 client with built-in safety limits (5MB/file, 500MB/user, 100 uploads/day)
-- Upload: `uploadToR2()` → stores file, returns key
-- Download: `downloadFromR2(key)` → returns buffer
-- Invoice `filePath` starts with `r2://` for R2-stored files, `fileUrl` holds the R2 key
-- Preview/download APIs auto-detect source (R2 vs DB base64 vs local filesystem)
+### Global state & long-running work (providers + floating widgets)
 
-Required env vars: `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
+Long-running client work (Gmail sync, file upload) must **survive client-side navigation**. It lives in a context provider mounted in the **root layout** (`src/app/layout.tsx`), not in a page's local state — otherwise leaving the page unmounts it and the progress/result is lost (the fetch keeps running server-side, so data still saves, but the UI feedback vanishes).
 
-### Invoice Workflow
+Providers (root layout, order matters — keep the tree structure **stable**): `SessionProvider → ThemeProvider → SyncProvider → UploadProvider → PendingCountProvider`.
+- `SyncProvider` / `UploadProvider` — hold the fetch + streamed progress; expose `startX()` + state. A matching floating widget (`SyncFloatingWidget`, `UploadFloatingWidget`, rendered in `src/app/(dashboard)/layout.tsx`) shows progress on every page **except** the page that owns the inline UI (`/settings`, `/upload`).
+- `PendingCountProvider` — single source for the sidebar badge; both `Sidebar` and `Header` consume it (previously each polled independently).
 
-Invoices follow a pending → approved flow:
-1. PDF/image uploaded → split into pages → OCR text extraction → auto-categorization
-2. Invoices saved with `status: "pending"` + file in R2 (no Expense record yet)
-3. User reviews/edits on `/invoices/pending` page (supports bulk select, approve, delete)
-4. On approval → Expense record created → counts in dashboard totals
+**Provider gotcha (caused a real bug):** a provider must render the **same tree** on every render. `ThemeProvider` once returned a bare `<>{children}</>` until mounted then swapped to `<Ctx.Provider>` — that structural change **remounted the whole app on hydration**, firing every data fetch twice. Apply side effects (e.g. theme classes) in an effect; don't gate the tree shape.
 
-### PDF Processing Pipeline
+### Streaming APIs
 
-`src/lib/pdf/split.ts` → splits PDF by page (pdf-lib)
-`src/lib/pdf/extract.ts` → text extraction (pdfjs-dist native, fallback: pdftoppm + tesseract OCR)
-`src/lib/pdf/categorize.ts` → regex-based extraction of: amount, currency, date, vendor, category, credit card last 4 digits
+`/api/email-sync` and `/api/upload-invoices` return a **newline-delimited JSON stream** (not SSE): each line is `{type:"progress", message, current, total}` or `{type:"done", ...}`. Clients read via `response.body.getReader()`. The provider pattern above consumes these.
 
-**Supports both Israeli and international invoices:**
-- Israeli: ₪, NIS, סה"כ כולל מע"מ, DD/MM/YYYY
-- International: $, €, £, USD/EUR/GBP, Total/Amount Due, Jan-Dec months, ISO dates
-- 13 categories including "תוכנה" (software/SaaS: Anthropic, AWS, GitHub, etc.)
+### Gmail integration
 
-OCR requires `poppler` installed locally (`brew install poppler`) for `pdftoppm`.
+`src/lib/gmail.ts` wraps `googleapis` — OAuth (readonly + `gmail.send` scopes), `getGmailClient` (auto-refreshes tokens), `searchEmails`/`getAttachments` (sync), `sendGmailMessage` (MIME builder for send-email). Tokens live on the `EmailAccount` row.
 
-### Auth
+**Do NOT import `src/lib/gmail.ts` from a route that runs on every page load.** The full `googleapis` package loads tens of MB into memory — enough to OOM the 512MB instance. Cheap scope checks (`canSendEmail`, scope constants) live in **`src/lib/gmail-scopes.ts`** (imports nothing heavy); import those on hot paths (e.g. `/api/settings`). `googleapis` should only load on real Gmail actions (sync / connect / callback / send).
 
-Google OAuth via NextAuth.js v4. Session callback auto-creates user in DB if missing.
-See `src/lib/auth.ts` for config, `src/lib/api-auth.ts` for API route helper.
+Tokens expire (Google revokes refresh tokens after ~6 months idle → `invalid_grant`); the account must be reconnected. Sync surfaces per-account auth failures instead of reporting a silent empty success.
 
-### Sidebar Active State
+### File storage (R2)
 
-Routes with sub-routes (like `/invoices` which has `/invoices/pending`) use `exact: true` flag to prevent both from highlighting. See navItems in `Sidebar.tsx` and `Header.tsx`.
+Files in **Cloudflare R2** (S3-compatible); falls back to base64 in the DB `fileData` column when R2 env vars are unset. `src/lib/r2.ts` enforces limits (5MB/file, 500MB/user, 100 uploads/day). Invoice `filePath` starts with `r2://` and `fileUrl` holds the key. Preview/download/send auto-detect R2 vs DB-base64 vs local. Env: `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`.
 
-## API Routes
+### PDF / HTML→PDF
 
-- `POST /api/upload-invoices` — upload files (PDF/images), OCR + categorize, save to R2, streaming progress
-- `GET /api/invoices?status=pending&categoryId=X&from=DATE&to=DATE` — list invoices
-- `PATCH /api/invoices/[id]` — edit invoice fields
-- `DELETE /api/invoices/[id]` — delete invoice + R2 file + associated expenses
-- `POST /api/invoices/[id]/approve` — approve invoice → creates Expense
-- `POST /api/invoices/bulk` — bulk approve or delete: `{ action: "approve"|"delete", ids: [...] }`
-- `POST /api/invoices/approve-all` — batch approve all pending
-- `GET /api/invoices/[id]/preview` — preview as image (supports R2/DB/local)
-- `GET /api/invoices/[id]/download` — download file (supports R2/DB/local)
-- `GET /api/dashboard` — summary stats, charts data, recent invoices
-- `GET /api/pending-count` — pending invoice count for sidebar badge
-- `GET/POST /api/categories` — list/create categories
+Ingest pipeline: `src/lib/pdf/split.ts` (pdf-lib, split by page) → `extract.ts` (pdfjs-dist, fallback pdftoppm+tesseract OCR) → `categorize.ts` (regex extraction of amount/currency/date/vendor/category/last-4). Handles Israeli (₪, מע"מ, DD/MM/YYYY) and international ($/€/£, ISO dates) invoices.
+
+`src/lib/html-to-pdf.ts` renders HTML invoices (inline-email invoices) to PDF via **puppeteer-core + system Chromium** (`CHROMIUM_PATH`, `/usr/bin/chromium` in Docker, local Chrome on macOS). It launches Chromium **per call and closes it immediately** (no persistent singleton) + `--single-process` flags — a resident Chromium (~150-300MB) OOMs the 512MB instance.
+
+### Invoice workflow
+
+`pending → approved`. Upload/sync → OCR + categorize → saved `status:"pending"` (no Expense yet) → user reviews on `/invoices/pending` → approve → creates `Expense` (counts in dashboard). Approved invoices (`/invoices`) can be emailed to an accountant as per-invoice PDFs (`/api/invoices/send-email`), tracked via `InvoiceSend`. Both invoice pages share the same client-side filter/sort/paginate UX: a "מיין" sort dropdown + a collapsible "סינון" panel (date range, amount range + currency, category).
+
+### Auth & sidebar
+
+NextAuth v4 Google OAuth; session callback auto-creates the user. `src/lib/auth.ts` (config), `src/lib/api-auth.ts` (`getAuthUser()` for routes). `src/middleware.ts` redirects unauthenticated requests to `/login` (allowlists `/api/auth`, `/login`, `/api/email-accounts/callback`, `/tour`). Sidebar/Header nav items use an `exact` flag so a parent route (`/invoices`) doesn't stay highlighted on a child (`/invoices/pending`).
+
+## Deployment & runtime constraints
+
+Deployed on **Render (Docker, Free tier: 512MB RAM, 0.1 CPU, spins down after ~15 min)**. Service `srv-d82olhv7f7vs738c5qdg`, URL `https://business-dashboard-362m.onrender.com`, auto-deploys on push to `main`.
+
+Memory is tight — the Dockerfile sets `NODE_OPTIONS=--max-old-space-size=350` **after** the build step (V8 otherwise sizes its heap against host RAM and OOM-restarts the container). Keep the heap cap and the two rules above (per-call Chromium; no `googleapis` on hot paths).
+
+The Render instance runs in **Oregon (US)** while Neon is in **Frankfurt (EU)** → cross-Atlantic latency on every query is the main speed bottleneck (plus 0.1 CPU). A GitHub Actions workflow (`.github/workflows/keep-alive.yml`) pings the app every 5 min to avoid cold-start spin-down.
+
+## API routes (beyond the obvious CRUD)
+
+`/api/invoices` (list, filterable) · `/api/invoices/[id]` (PATCH/DELETE) · `.../approve` · `.../unapprove` · `.../preview` · `.../download` (HTML→PDF on the fly) · `/api/invoices/bulk` (approve/delete) · `/api/invoices/approve-all` · `/api/invoices/bulk-download` (ZIP) · `/api/invoices/export` (CSV) · `/api/invoices/send-email` (per-invoice PDFs → Gmail) · `/api/settings` (GET/PATCH accountant email + sender-account send flags; imports gmail-scopes, NOT gmail) · `/api/email-sync` + `/api/email-accounts/*` (Gmail connect/callback/sync) · `/api/dashboard` · `/api/pending-count`.
 
 ## Database
 
-13 default Hebrew categories seeded: דלק, סופר, מסעדות, תחבורה, ביטוח, תקשורת, חשמל ומים, שכירות, ציוד משרדי, שיווק ופרסום, מיסים, תוכנה, אחר.
-
-Key relationships: Invoice → Category, Invoice → Expenses (1:many), Expense → CreditCard (optional).
-
-Invoice has `currency` field (ILS/USD/EUR/GBP) for international invoice support.
-
-## Deployment
-
-Deployed on Render (Docker + PostgreSQL). Cloudflare R2 for file storage.
-R2 env vars must be set on Render for production file storage.
+Models: `User` (has `accountantEmail`), `Category`, `CreditCard`, `Expense`, `Invoice` (`currency` ILS/USD/EUR/GBP, `fileHash` for dedup, `status`), `EmailAccount` (Gmail `accessToken`/`refreshToken`/`scopes`), `SyncRange` (sync history), `InvoiceSend` (email-send tracking). 13 seeded Hebrew categories (דלק, סופר, …, תוכנה, אחר). Relationships: Invoice→Category, Invoice→Expenses (1:many), Invoice→InvoiceSend (1:many), Expense→CreditCard (optional), EmailAccount→Invoice.
 
 @AGENTS.md
