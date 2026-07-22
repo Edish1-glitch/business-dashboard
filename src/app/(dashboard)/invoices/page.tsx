@@ -76,9 +76,14 @@ type SentFilter = "all" | "sent" | "unsent";
 const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", ILS: "₪" };
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString("he-IL");
 
+// Stale-while-revalidate cache (module scope → persists across client-side
+// navigation) so revisiting shows the last data instantly instead of a blank
+// reload/spinner; refreshed in the background on each mount.
+let approvedCache: { invoices: Invoice[]; accountantEmail: string; senderAccounts: SenderAccount[] } | null = null;
+
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [invoices, setInvoices] = useState<Invoice[]>(approvedCache?.invoices ?? []);
+  const [loading, setLoading] = useState(approvedCache === null);
 
   // filters / sort / search
   const [filterCategory, setFilterCategory] = useState("");
@@ -108,11 +113,11 @@ export default function InvoicesPage() {
 
   // send dialog
   const [sendTargetIds, setSendTargetIds] = useState<string[] | null>(null);
-  const [accountantEmail, setAccountantEmail] = useState("");
-  const [senderAccounts, setSenderAccounts] = useState<SenderAccount[]>([]);
+  const [accountantEmail, setAccountantEmail] = useState(approvedCache?.accountantEmail ?? "");
+  const [senderAccounts, setSenderAccounts] = useState<SenderAccount[]>(approvedCache?.senderAccounts ?? []);
 
+  // Revalidate in the background; only the first-ever load shows a spinner (loading init).
   const fetchData = useCallback(async () => {
-    setLoading(true);
     try {
       const [invRes, setRes] = await Promise.all([
         fetch("/api/invoices?status=approved"),
@@ -120,18 +125,24 @@ export default function InvoicesPage() {
       ]);
       const invData = await invRes.json();
       const setData = await setRes.json();
-      setInvoices(invData.invoices || []);
-      setAccountantEmail(setData.accountantEmail || "");
-      setSenderAccounts(setData.senderAccounts || []);
+      const inv = invData.invoices || [];
+      const email = setData.accountantEmail || "";
+      const senders = setData.senderAccounts || [];
+      setInvoices(inv);
+      setAccountantEmail(email);
+      setSenderAccounts(senders);
+      approvedCache = { invoices: inv, accountantEmail: email, senderAccounts: senders };
     } catch {
-      setInvoices([]);
+      if (approvedCache === null) setInvoices([]);
     } finally {
       setLoading(false);
-      setSelected(new Set());
     }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Mirror optimistic (send/unapprove/delete) changes into the cache for the next visit.
+  useEffect(() => { approvedCache = { invoices, accountantEmail, senderAccounts }; }, [invoices, accountantEmail, senderAccounts]);
 
   const categoryList = useMemo(() => {
     const set = new Set<string>();

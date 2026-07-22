@@ -38,22 +38,29 @@ interface DashboardData {
   }[];
 }
 
+// Stale-while-revalidate cache of the default (unfiltered) dashboard so
+// revisiting shows the last stats instantly instead of a blank reload.
+let dashboardCache: DashboardData | null = null;
+
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData | null>(dashboardCache);
+  const [loading, setLoading] = useState(dashboardCache === null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showCustomDate, setShowCustomDate] = useState(false);
 
+  // Revalidate in the background; only the first-ever load shows a spinner.
   const fetchData = useCallback(async () => {
-    setLoading(true);
     try {
       const params = new URLSearchParams();
       if (dateFrom) params.set("from", dateFrom);
       if (dateTo) params.set("to", dateTo);
       const res = await fetch(`/api/dashboard?${params}`);
       const d = await res.json();
-      if (!d.error) setData(d);
+      if (!d.error) {
+        setData(d);
+        if (!dateFrom && !dateTo) dashboardCache = d; // cache only the default view
+      }
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, [dateFrom, dateTo]);
