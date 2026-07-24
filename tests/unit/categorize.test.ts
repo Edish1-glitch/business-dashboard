@@ -32,6 +32,20 @@ describe("extractAmount", () => {
     expect(extractAmount('99 ש"ח')).toEqual({ amount: 99, currency: "ILS" });
   });
 
+  // Real bug: restaurant receipts print the total as 'סה"כ בש"ח 273.90' (currency
+  // BEFORE the number, no ₪). The parser missed these and dropped real receipts.
+  it('reads "סה"כ בש"ח <amount>" totals (currency before the number)', () => {
+    expect(extractAmount('נאגטס עוף\nסה"כ בש"ח 273.90')).toEqual({ amount: 273.9, currency: "ILS" });
+    expect(extractAmount('סה"כ בש"ח 598.90')).toEqual({ amount: 598.9, currency: "ILS" });
+    expect(extractAmount('סה"כ בש"ח 139.75')).toEqual({ amount: 139.75, currency: "ILS" });
+    expect(extractAmount('סך הכל בש"ח 1,187.90')).toEqual({ amount: 1187.9, currency: "ILS" });
+  });
+
+  it('prefers the סה"כ total over an earlier line-item בש"ח price', () => {
+    const text = 'פריט בש"ח 45.00\nמשלוח בש"ח 15.00\nסה"כ בש"ח 138.90';
+    expect(extractAmount(text)).toEqual({ amount: 138.9, currency: "ILS" });
+  });
+
   it("reads international $, €, £ totals", () => {
     expect(extractAmount("Total: $99.99")).toEqual({ amount: 99.99, currency: "USD" });
     expect(extractAmount("Amount Due: €50.00")).toEqual({ amount: 50, currency: "EUR" });
@@ -229,6 +243,27 @@ describe("hasInvoiceSignals", () => {
 
   it("returns false for unrelated text", () => {
     expect(hasInvoiceSignals("just a friendly hello")).toBe(false);
+  });
+
+  // Real bug: a 24-page PayPal *User Agreement* was imported as 24 "invoices"
+  // because it mentions תשלום/סכום/עסקה. Generic money words are NOT enough —
+  // require a real invoice keyword OR an actual amount.
+  it("rejects legal/agreement prose that only mentions money generically", () => {
+    const ua = "הסכם המשתמש. השירותים שלנו. הסכום של כל עסקה בלתי מורשית. תשלום. פעילות מוגבלת.";
+    expect(hasInvoiceSignals(ua)).toBe(false);
+  });
+
+  it("rejects marketing text that mentions payment but has no amount", () => {
+    expect(hasInvoiceSignals("מבצע מיוחד! שלמו פחות והצטרפו עכשיו")).toBe(false);
+  });
+
+  it("keeps a receipt that only shows a total amount (no 'invoice' word)", () => {
+    expect(hasInvoiceSignals('נאגטס עוף\nסה"כ בש"ח 273.90')).toBe(true);
+  });
+
+  it("keeps anything that names itself an invoice/receipt", () => {
+    expect(hasInvoiceSignals("חשבונית מס 123")).toBe(true);
+    expect(hasInvoiceSignals("Payment receipt")).toBe(true);
   });
 });
 

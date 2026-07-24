@@ -79,6 +79,11 @@ export function extractAmount(text: string): { amount: number; currency: string 
     [/סה"כ\s+כולל\s+מע.?[םמ]\s*([\d,]+\.?\d*)/, "ILS"],
     [/סה"כ\s+לתשלום\s*[-–]\s*\S+\s*([\d,]+\.?\d*)/, "ILS"],
     [/סה"כ\s+לתשלום[:\s]*([\d,]+\.?\d*)/, "ILS"],
+    // Currency BEFORE the number: 'סה"כ בש"ח 273.90' / 'סך הכל בש"ח ...' (common on
+    // Israeli restaurant/delivery receipts, no ₪ sign). Total-line first so an
+    // earlier line-item 'בש"ח <price>' doesn't win.
+    [/סה["״]?כ\s+ב?ש["״]?ח\s*([\d,]+\.?\d*)/, "ILS"],
+    [/סך\s+הכ["״]?ל\s+ב?ש["״]?ח\s*([\d,]+\.?\d*)/, "ILS"],
     [/התקבל[:\s]+\S+\s*([\d,]+\.?\d*)/, "ILS"],
     [/(?:לחיוב|סכום)[:\s]*[₪]?\s*([\d,]+\.?\d*)/, "ILS"],
     [/₪\s*([\d,]+\.?\d*)/, "ILS"],
@@ -347,17 +352,17 @@ const NEGATIVE_PATTERNS = [
   /terms\s+of\s+employment/i,
 ];
 
-const INVOICE_SIGNALS_HE = [
-  "חשבונית", "קבלה", "חיוב", "תשלום", "סה\"כ",
-  "סכום", "מע\"מ", "עוסק מורשה", "ח.פ", "ע.מ",
-  "לתשלום", "שולם", "התקבל", "אישור תשלום",
+// STRONG signals — a document that says these is really an invoice/receipt.
+// Legal agreements and marketing emails don't contain them, even though they
+// discuss "payment"/"amount"/"transaction" in the abstract.
+const INVOICE_SIGNALS_STRONG_HE = [
+  "חשבונית", "קבלה", "עוסק מורשה", "עוסק פטור", "ח.פ", "ע.מ",
+  "אישור תשלום", "אסמכתא", "חשבונית מס", "חשבון עסקה",
 ];
 
-const INVOICE_SIGNALS_EN = [
-  "invoice", "receipt", "billing", "payment",
-  "total", "amount due", "subtotal", "tax",
-  "paid", "charge", "transaction",
-  "order total", "purchase", "subscription",
+const INVOICE_SIGNALS_STRONG_EN = [
+  "invoice", "receipt", "tax invoice", "order confirmation",
+  "order total", "amount due", "amount paid", "billing statement", "subtotal",
 ];
 
 export function isNegativeInvoice(text: string): boolean {
@@ -367,11 +372,16 @@ export function isNegativeInvoice(text: string): boolean {
   return false;
 }
 
+// A real invoice either NAMES itself (חשבונית / receipt / …) or carries a real
+// monetary total. Generic words alone (תשלום / סכום / total / payment) are not
+// enough — they appear in legal & marketing text too, which is how a 24-page
+// PayPal user-agreement slipped in as 24 "invoices".
 export function hasInvoiceSignals(text: string): boolean {
   const lower = text.toLowerCase();
-  const hasHebrew = INVOICE_SIGNALS_HE.some((s) => lower.includes(s.toLowerCase()));
-  const hasEnglish = INVOICE_SIGNALS_EN.some((s) => lower.includes(s));
-  return hasHebrew || hasEnglish;
+  const strong =
+    INVOICE_SIGNALS_STRONG_HE.some((s) => lower.includes(s.toLowerCase())) ||
+    INVOICE_SIGNALS_STRONG_EN.some((s) => lower.includes(s));
+  return strong || extractAmount(text) !== null;
 }
 
 /**
