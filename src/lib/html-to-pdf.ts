@@ -1,5 +1,26 @@
 import puppeteer, { Browser } from "puppeteer-core";
 
+/**
+ * Global one-at-a-time gate for Chromium launches.
+ *
+ * A single Chromium is ~150-300MB. On Render's 512MB instance TWO concurrent
+ * conversions (e.g. a bulk-download rendering while a user downloads/sends
+ * another invoice, or two browser tabs) push native memory past the limit and
+ * the container is OOM-killed. Launching per-call already frees memory quickly,
+ * but nothing serialized the calls — this queue guarantees only one htmlToPdf
+ * runs at a time; the rest wait a beat. Errors are swallowed on the chain so a
+ * single failed conversion never wedges the queue for everyone.
+ */
+let chromiumQueue: Promise<unknown> = Promise.resolve();
+function withChromiumLock<T>(fn: () => Promise<T>): Promise<T> {
+  const result = chromiumQueue.then(fn, fn);
+  chromiumQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+}
+
 function getChromePath(): string {
   if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
   if (process.platform === "darwin") {
@@ -22,6 +43,11 @@ function getChromePath(): string {
  * --no-zygote) further cut peak memory during conversion.
  */
 export async function htmlToPdf(html: string): Promise<Buffer> {
+  // Serialize all Chromium launches process-wide (see withChromiumLock above).
+  return withChromiumLock(() => convertHtmlToPdf(html));
+}
+
+async function convertHtmlToPdf(html: string): Promise<Buffer> {
   const browser: Browser = await puppeteer.launch({
     headless: true,
     executablePath: getChromePath(),

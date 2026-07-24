@@ -15,25 +15,21 @@ const MAX_STORAGE_BYTES = R2_LIMITS.MAX_TOTAL_STORAGE;
  * For DB files: use base64 data length.
  */
 async function getStorageUsed(): Promise<number> {
-  const invoices = await prisma.invoice.findMany({
-    select: { fileData: true, filePath: true },
-  });
-
-  let totalBytes = 0;
-  for (const inv of invoices) {
-    if (inv.filePath.startsWith("r2://") && inv.fileData) {
-      // R2 files that also have fileData (shouldn't happen but handle it)
-      totalBytes += Buffer.byteLength(inv.fileData, "base64") * 0.75;
-    } else if (inv.filePath.startsWith("r2://")) {
-      // R2 file without fileData: estimate ~200KB average invoice
-      totalBytes += 200 * 1024;
-    } else if (inv.fileData) {
-      // DB base64 file
-      totalBytes += Buffer.byteLength(inv.fileData, "base64") * 0.75;
-    }
-  }
-
-  return totalBytes;
+  // Sum sizes in SQL. The old version did findMany({select:{fileData}}) over the
+  // WHOLE table — i.e. it loaded every base64 blob in the DB into memory just to
+  // add up lengths, a large spike at the start of every sync. This does the same
+  // arithmetic in the database: decoded bytes ≈ base64 length * 0.75 for stored
+  // files, ~200KB estimate for R2-only files.
+  const rows = await prisma.$queryRawUnsafe<[{ total: number | null }]>(
+    `SELECT COALESCE(SUM(
+        CASE
+          WHEN "fileData" IS NOT NULL THEN LENGTH("fileData") * 0.75
+          WHEN "filePath" LIKE 'r2://%' THEN 204800
+          ELSE 0
+        END
+      ), 0)::float8 AS total FROM "Invoice"`
+  );
+  return Number(rows[0]?.total ?? 0);
 }
 
 // GET: return sync ranges for user's accounts

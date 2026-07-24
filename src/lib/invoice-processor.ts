@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { splitPdfToPages } from "@/lib/pdf/split";
+import { splitPdfToPages, countPdfPages } from "@/lib/pdf/split";
 import { extractTextFromPdf } from "@/lib/pdf/extract";
 import { ocrFromImage } from "@/lib/pdf/ocr-image";
 import { extractInvoiceData, isNegativeInvoice, hasInvoiceSignals } from "@/lib/pdf/categorize";
@@ -166,6 +166,20 @@ export async function splitPdfToPageBuffers(
     fileName: `${path.basename(originalName, ext)}_page${i + 1}.pdf`,
     isImage: false,
   }));
+}
+
+/**
+ * How many pages/units a file will yield, without splitting it (cheap).
+ * Images count as 1; unparseable files also count as 1.
+ */
+export async function countPageBuffers(buffer: Buffer, originalName: string): Promise<number> {
+  const ext = path.extname(originalName).toLowerCase();
+  if (IMAGE_EXTENSIONS.includes(ext)) return 1;
+  try {
+    return await countPdfPages(buffer);
+  } catch {
+    return 1;
+  }
 }
 
 /**

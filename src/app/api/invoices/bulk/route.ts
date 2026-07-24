@@ -15,9 +15,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "יש לבחור לפחות חשבונית אחת" }, { status: 400 });
     }
 
-    // Verify all invoices belong to user
+    // Verify all invoices belong to user. Select only what approve/delete use —
+    // not the fileData blob.
     const invoices = await prisma.invoice.findMany({
       where: { id: { in: ids }, userId: user.id },
+      select: {
+        id: true, status: true, amount: true, vendor: true, fileName: true,
+        date: true, categoryId: true, creditCardLast4: true, fileUrl: true, filePath: true,
+      },
     });
 
     if (invoices.length === 0) {

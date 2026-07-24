@@ -67,7 +67,10 @@ export async function GET(request: NextRequest) {
     // Recent invoices (last 5 approved)
     const recentInvoices = await prisma.invoice.findMany({
       where: { userId: user.id, status: "approved" },
-      include: { category: true },
+      select: {
+        id: true, vendor: true, amount: true, currency: true, date: true,
+        creditCardLast4: true, createdAt: true, category: true,
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
     });

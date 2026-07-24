@@ -42,7 +42,15 @@ export async function GET(request: NextRequest) {
 
     const invoices = await prisma.invoice.findMany({
       where,
-      include: {
+      // Explicit select — never return the base64 `fileData` blob to the list.
+      // The client only shows metadata; the file itself is fetched on demand via
+      // the preview/download routes. Returning fileData here loaded every file's
+      // full contents into memory on a hot page (a chronic OOM contributor).
+      select: {
+        id: true, fileName: true, filePath: true, fileUrl: true,
+        vendor: true, amount: true, currency: true, date: true,
+        source: true, status: true, creditCardLast4: true,
+        categoryId: true, emailAccountId: true, createdAt: true,
         category: true,
         emailAccount: { select: { email: true } },
         sends: { orderBy: { createdAt: "desc" }, select: { id: true, sentTo: true, subject: true, fromEmail: true, createdAt: true } },

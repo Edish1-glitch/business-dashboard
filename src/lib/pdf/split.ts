@@ -20,3 +20,13 @@ export async function splitPdfToPages(
 
   return pages;
 }
+
+/**
+ * Count the pages of a PDF without materializing any per-page buffers.
+ * Lets callers show an accurate total up front while still splitting +
+ * processing one file at a time (bounded memory).
+ */
+export async function countPdfPages(pdfBuffer: Buffer): Promise<number> {
+  const srcDoc = await PDFDocument.load(pdfBuffer);
+  return srcDoc.getPageCount();
+}

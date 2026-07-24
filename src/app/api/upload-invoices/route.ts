@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/api-auth";
-import { processAndSave, splitPdfToPageBuffers } from "@/lib/invoice-processor";
+import { processAndSave, splitPdfToPageBuffers, countPageBuffers } from "@/lib/invoice-processor";
 import { R2_LIMITS } from "@/lib/r2";
 import { prisma } from "@/lib/db";
 
@@ -40,38 +40,40 @@ export async function POST(request: NextRequest) {
         const results = [];
         let processed = 0;
 
-        // Split all files into pages
-        const pageBuffers: { buffer: Buffer; fileName: string; isImage: boolean; sourceFile: string }[] = [];
+        // Pre-count pages cheaply (one file loaded at a time, released immediately)
+        // so we can show an accurate total WITHOUT holding every page of every file.
+        let totalPages = 0;
         for (const file of files) {
-          const buffer = Buffer.from(await file.arrayBuffer());
-          const pages = await splitPdfToPageBuffers(buffer, file.name);
-          for (const page of pages) {
-            pageBuffers.push({ ...page, sourceFile: file.name });
-          }
+          const buf = Buffer.from(await file.arrayBuffer());
+          totalPages += await countPageBuffers(buf, file.name);
         }
-
-        const totalPages = pageBuffers.length;
 
         controller.enqueue(encoder.encode(
           JSON.stringify({ type: "progress", total: totalPages, current: 0, message: `מתחיל עיבוד ${totalPages} חשבוניות...` }) + "\n"
         ));
 
-        for (const page of pageBuffers) {
-          processed++;
-          controller.enqueue(encoder.encode(
-            JSON.stringify({ type: "progress", total: totalPages, current: processed, message: `מעבד חשבונית ${processed} מתוך ${totalPages}...` }) + "\n"
-          ));
+        // Process ONE file at a time: split -> process its pages -> release before
+        // the next file, so at most a single file's page buffers are resident.
+        for (const file of files) {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const pages = await splitPdfToPageBuffers(buffer, file.name);
+          for (const page of pages) {
+            processed++;
+            controller.enqueue(encoder.encode(
+              JSON.stringify({ type: "progress", total: totalPages, current: processed, message: `מעבד חשבונית ${processed} מתוך ${totalPages}...` }) + "\n"
+            ));
 
-          try {
-            const result = await processAndSave(page.buffer, page.fileName, user.id, page.isImage);
-            results.push({ ...result, page: processed, sourceFile: page.sourceFile });
-          } catch (err) {
-            results.push({
-              id: null, fileName: page.fileName, vendor: null, amount: null,
-              date: null, category: null, creditCardLast4: null,
-              duplicate: false, message: err instanceof Error ? err.message : "שגיאה בעיבוד",
-              similarWarning: null, page: processed, sourceFile: page.sourceFile,
-            });
+            try {
+              const result = await processAndSave(page.buffer, page.fileName, user.id, page.isImage);
+              results.push({ ...result, page: processed, sourceFile: file.name });
+            } catch (err) {
+              results.push({
+                id: null, fileName: page.fileName, vendor: null, amount: null,
+                date: null, category: null, creditCardLast4: null,
+                duplicate: false, message: err instanceof Error ? err.message : "שגיאה בעיבוד",
+                similarWarning: null, page: processed, sourceFile: file.name,
+              });
+            }
           }
         }
 

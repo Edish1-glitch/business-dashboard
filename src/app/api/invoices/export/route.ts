@@ -12,7 +12,11 @@ export async function GET(request: NextRequest) {
 
     const invoices = await prisma.invoice.findMany({
       where: { userId: user.id, status: "approved" },
-      include: { category: true },
+      // Only the columns the CSV needs — never load fileData for an export.
+      select: {
+        vendor: true, amount: true, date: true, creditCardLast4: true, source: true,
+        category: { select: { name: true } },
+      },
       orderBy: { date: "desc" },
     });
 
