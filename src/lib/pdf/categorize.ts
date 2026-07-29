@@ -72,11 +72,37 @@ export function detectCategory(text: string): string {
  * Extracts amount from invoice text.
  * Supports Israeli (₪/NIS/ILS) and international ($, EUR, GBP, etc.) formats.
  */
+/**
+ * Parse a numeric string that may use a European decimal comma.
+ * - "1,234.56" -> 1234.56  (comma = thousands, period = decimal)
+ * - "34,80"    -> 34.80    (comma + exactly 2 trailing digits = decimal)
+ * - "1,250"    -> 1250     (comma + 3 digits = thousands)
+ * - "1.234,56" -> 1234.56  (period = thousands, comma = decimal)
+ */
+function parseNumericAmount(raw: string): number {
+  let s = raw.trim();
+  const hasComma = s.includes(",");
+  const hasDot = s.includes(".");
+  if (hasComma && hasDot) {
+    // Whichever separator comes last is the decimal separator.
+    if (s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g, "").replace(",", ".");
+    else s = s.replace(/,/g, "");
+  } else if (hasComma) {
+    // Comma only: decimal if it's followed by exactly 2 digits (34,80); else thousands.
+    if (/,\d{2}$/.test(s) && !/,\d{3}/.test(s)) s = s.replace(",", ".");
+    else s = s.replace(/,/g, "");
+  }
+  return parseFloat(s);
+}
+
 export function extractAmount(text: string): { amount: number; currency: string } | null {
   // Israeli patterns (highest priority for Israeli invoices)
   const israeliPatterns: [RegExp, string][] = [
     [/סה"כ\s+כולל\s+מע["\u05F4]?מ\s*([\d,]+\.?\d*)/, "ILS"],
     [/סה"כ\s+כולל\s+מע.?[םמ]\s*([\d,]+\.?\d*)/, "ILS"],
+    // "סה"כ לתשלום" then the amount, tolerating a few words in between
+    // ("סה"כ לתשלום - שונות 30.00") so the total isn't lost to a nearby number.
+    [/סה"כ\s+לתשלום[^\d₪\n]{0,18}?([\d.,]+\.?\d*)/, "ILS"],
     [/סה"כ\s+לתשלום\s*[-–]\s*\S+\s*([\d,]+\.?\d*)/, "ILS"],
     [/סה"כ\s+לתשלום[:\s]*([\d,]+\.?\d*)/, "ILS"],
     // Currency BEFORE the number: 'סה"כ בש"ח 273.90' / 'סך הכל בש"ח ...' (common on
@@ -124,7 +150,7 @@ export function extractAmount(text: string): { amount: number; currency: string 
   for (const [pattern, currency] of israeliPatterns) {
     const match = text.match(pattern);
     if (match) {
-      const value = parseFloat(match[1].replace(/,/g, ""));
+      const value = parseNumericAmount(match[1]);
       if (value > 0 && value < 10000000) {
         return { amount: value, currency };
       }
@@ -135,7 +161,7 @@ export function extractAmount(text: string): { amount: number; currency: string 
   for (const [pattern, currency] of internationalPatterns) {
     const match = text.match(pattern);
     if (match) {
-      const value = parseFloat(match[1].replace(/,/g, ""));
+      const value = parseNumericAmount(match[1]);
       if (value > 0 && value < 10000000) {
         return { amount: value, currency };
       }
@@ -150,15 +176,22 @@ export function extractAmount(text: string): { amount: number; currency: string 
  * Supports DD/MM/YYYY (Israeli), MM/DD/YYYY (US), YYYY-MM-DD (ISO), and text months.
  */
 export function extractDate(text: string): Date | null {
+  // A transaction date can't be in the future. Fuel receipts print a loyalty-
+  // points expiry ("למימוש עד: 31/12/2027") that was being picked up instead of
+  // the real date; rejecting future dates skips it and finds the transaction date.
+  const now = new Date();
+  const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+  const notFuture = (d: Date) => d <= maxDate;
+
   // Year-first (ISO-style): 2025-01-15, 2025/01/15, 2025.01.15 — unambiguous, try first.
   // (Handling only dashes here meant '2025/02/08' fell through and was misread as 2008.)
-  const isoMatch = text.match(/(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
-  if (isoMatch) {
-    const year = parseInt(isoMatch[1]);
-    const month = parseInt(isoMatch[2]);
-    const day = parseInt(isoMatch[3]);
+  for (const m of text.matchAll(/(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/g)) {
+    const year = parseInt(m[1]);
+    const month = parseInt(m[2]);
+    const day = parseInt(m[3]);
     if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return new Date(year, month - 1, day);
+      const d = new Date(year, month - 1, day);
+      if (notFuture(d)) return d;
     }
   }
 
@@ -209,32 +242,28 @@ export function extractDate(text: string): Date | null {
     }
   }
 
-  // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY — iterate all matches, skip future ones.
   const numericPatterns = [
-    /(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/,
-    /(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})\b/,
+    /(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/g,
+    /(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})\b/g,
   ];
 
   for (const pattern of numericPatterns) {
-    const match = text.match(pattern);
-    if (match) {
+    for (const match of text.matchAll(pattern)) {
       const a = parseInt(match[1]);
       const b = parseInt(match[2]);
       let year = parseInt(match[3]);
       if (year < 100) year += 2000;
 
+      let candidate: Date | null = null;
       // If first number > 12, it must be DD/MM (Israeli format)
-      if (a > 12 && b >= 1 && b <= 12) {
-        return new Date(year, b - 1, a);
-      }
+      if (a > 12 && b >= 1 && b <= 12) candidate = new Date(year, b - 1, a);
       // If second number > 12, it must be MM/DD (US format)
-      if (b > 12 && a >= 1 && a <= 12) {
-        return new Date(year, a - 1, b);
-      }
+      else if (b > 12 && a >= 1 && a <= 12) candidate = new Date(year, a - 1, b);
       // Ambiguous - default to DD/MM (Israeli)
-      if (a >= 1 && a <= 31 && b >= 1 && b <= 12) {
-        return new Date(year, b - 1, a);
-      }
+      else if (a >= 1 && a <= 31 && b >= 1 && b <= 12) candidate = new Date(year, b - 1, a);
+
+      if (candidate && notFuture(candidate)) return candidate;
     }
   }
 

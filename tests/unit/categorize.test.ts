@@ -46,6 +46,25 @@ describe("extractAmount", () => {
     expect(extractAmount(text)).toEqual({ amount: 138.9, currency: "ILS" });
   });
 
+  // Real bug: European decimal comma ("34,80" = 34.80) was read as thousands
+  // ("34,80" -> 3480). Fuel receipts printed the total this way.
+  it("reads a European decimal comma as the decimal point, not thousands", () => {
+    expect(extractAmount('סה"כ לתשלום 34,80 ש"ח')).toEqual({ amount: 34.8, currency: "ILS" });
+    expect(extractAmount("₪22,00")).toEqual({ amount: 22, currency: "ILS" });
+  });
+
+  it("still treats a comma before 3 digits as a thousands separator", () => {
+    expect(extractAmount("1,234.56 NIS")).toEqual({ amount: 1234.56, currency: "ILS" });
+    expect(extractAmount('סה"כ 1,250 ש"ח')).toEqual({ amount: 1250, currency: "ILS" });
+  });
+
+  // Real bug: fuel receipt total 'סה"כ לתשלום - שונות 30.00' — words between the
+  // label and the number made the parser grab an unrelated number (loyalty 22,00).
+  it('reads the total even when words sit between "לתשלום" and the number', () => {
+    const text = 'פריט 22,00\nסה"כ לתשלום - שונות 30.00\nצברת 2.20';
+    expect(extractAmount(text)).toEqual({ amount: 30, currency: "ILS" });
+  });
+
   it("reads international $, €, £ totals", () => {
     expect(extractAmount("Total: $99.99")).toEqual({ amount: 99.99, currency: "USD" });
     expect(extractAmount("Amount Due: €50.00")).toEqual({ amount: 50, currency: "EUR" });
@@ -100,6 +119,18 @@ describe("extractDate", () => {
 
   it("returns null when there is no date", () => {
     expect(extractDate("no date at all")).toBeNull();
+  });
+
+  // Real bug: fuel receipts print a loyalty-points expiry ("למימוש עד: 30/06/2027")
+  // that was picked up instead of the transaction date. A transaction can't be in
+  // the future — skip future dates and use the real one.
+  it("skips a future expiry date and uses the transaction date", () => {
+    const text = 'תאריך עסקה 15/07/2025\nנקודות למימוש עד: 30/06/2027';
+    expect(ymd(extractDate(text))).toEqual([2025, 7, 15]);
+  });
+
+  it("does not return a clearly-future date even if it's the only one", () => {
+    expect(extractDate("למימוש עד: 31/12/2027")).toBeNull();
   });
 });
 
