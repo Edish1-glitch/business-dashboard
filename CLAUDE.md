@@ -60,6 +60,10 @@ Providers (root layout, order matters — keep the tree structure **stable**): `
 
 `/api/email-sync` and `/api/upload-invoices` return a **newline-delimited JSON stream** (not SSE): each line is `{type:"progress", message, current, total}` or `{type:"done", ...}`. Clients read via `response.body.getReader()`. The provider pattern above consumes these.
 
+**Upload robustness (learned the hard way):**
+- `upload-invoices` must be resilient per file: the split/OCR of one file is wrapped so a single corrupt/encrypted/non-PDF file becomes one error row, never aborting the batch. `start()` must ALWAYS emit a `done` event (with whatever results exist) — a silent empty stream showed the user "0 processed".
+- **OCR is the real cost.** Scanned pages (no embedded text) fall back to `pdftoppm` + `tesseract heb+eng` at ~3-4s **per page**; a 90-page scanned bundle is minutes of work. `UploadProvider` therefore uploads **one file per request** (not one giant request) so each stays short enough to beat platform/proxy timeouts; progress/results aggregate across requests. Don't revert to a single multi-file request. Lowering OCR DPI does NOT help meaningfully (tesseract-bound) and hurts amount accuracy — leave it at 300.
+
 ### Gmail integration
 
 `src/lib/gmail.ts` wraps `googleapis` — OAuth (readonly + `gmail.send` scopes), `getGmailClient` (auto-refreshes tokens), `searchEmails`/`getAttachments` (sync), `sendGmailMessage` (MIME builder for send-email). Tokens live on the `EmailAccount` row.
