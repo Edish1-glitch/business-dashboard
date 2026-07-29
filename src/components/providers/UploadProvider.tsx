@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 
 export interface InvoiceResult {
-  id: string;
+  id: string | null;
   page: number;
   fileName: string;
   sourceFile: string;
@@ -12,6 +12,8 @@ export interface InvoiceResult {
   date: string | null;
   category: string | null;
   creditCardLast4: string | null;
+  duplicate?: boolean;
+  message?: string | null;
 }
 
 interface UploadState {
@@ -105,11 +107,19 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       }
 
       const invoices = finalData?.invoices || [];
+      // Accurate breakdown: saved (new, has id, not a duplicate) vs duplicates vs
+      // failures. "0 processed" for a whole batch was masking per-file errors.
+      const saved = invoices.filter((r) => r.id && !r.duplicate).length;
+      const duplicates = invoices.filter((r) => r.duplicate).length;
+      const failed = invoices.filter((r) => !r.id && !r.duplicate).length;
+      const parts = [`${saved} נשמרו`];
+      if (duplicates > 0) parts.push(`${duplicates} כפילויות`);
+      if (failed > 0) parts.push(`${failed} נכשלו`);
       setUploadState({
         isUploading: false,
         progress: "",
         percent: 0,
-        result: `${invoices.length} חשבוניות עובדו בהצלחה`,
+        result: parts.join(" · "),
         invoices,
       });
     } catch {

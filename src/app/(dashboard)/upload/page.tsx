@@ -180,53 +180,78 @@ export default function UploadPage() {
       )}
 
       {/* Results */}
-      {!uploadState.isUploading && uploadState.invoices && uploadState.invoices.length > 0 && (
+      {!uploadState.isUploading && uploadState.invoices && uploadState.invoices.length > 0 && (() => {
+        const rows = uploadState.invoices!;
+        const saved = rows.filter((r) => r.id && !r.duplicate);
+        const duplicates = rows.filter((r) => r.duplicate);
+        const failed = rows.filter((r) => !r.id && !r.duplicate);
+        return (
         <div className="space-y-4">
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+          <div className={`flex items-center gap-3 p-4 rounded-xl border ${saved.length > 0 ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+            {saved.length > 0
+              ? <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+              : <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />}
             <div>
-              <p className="font-semibold text-emerald-900">
-                {uploadState.invoices.length} חשבוניות עובדו בהצלחה
+              <p className={`font-semibold ${saved.length > 0 ? "text-emerald-900" : "text-amber-900"}`}>
+                {saved.length} נשמרו
+                {duplicates.length > 0 && ` · ${duplicates.length} כפילויות`}
+                {failed.length > 0 && ` · ${failed.length} נכשלו`}
               </p>
-              <p className="text-sm text-emerald-700">
-                עבור ל<a href="/invoices/pending" className="underline font-medium">ממתינות לאישור</a> כדי לבדוק ולאשר
-              </p>
+              {saved.length > 0 && (
+                <p className="text-sm text-emerald-700">
+                  עבור ל<a href="/invoices/pending" className="underline font-medium">ממתינות לאישור</a> כדי לבדוק ולאשר
+                </p>
+              )}
             </div>
           </div>
 
           <div className="grid gap-2">
-            {uploadState.invoices.map((inv) => (
-              <div key={inv.id} className="rounded-xl bg-card border border-border/50 p-3 shadow-sm">
+            {rows.map((inv, i) => {
+              const isError = !inv.id && !inv.duplicate;
+              const isDup = !!inv.duplicate;
+              return (
+              <div
+                key={inv.id || `${inv.sourceFile}-${inv.page}-${i}`}
+                className={`rounded-xl border p-3 shadow-sm ${isError ? "bg-red-50 border-red-200" : isDup ? "bg-muted/40 border-border/50" : "bg-card border-border/50"}`}
+              >
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      {isError
+                        ? <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                        : <Building2 className="h-3.5 w-3.5 text-muted-foreground" />}
                       <span className="text-sm font-medium">{inv.vendor || inv.fileName}</span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      {inv.amount !== null && (
-                        <span className="font-bold">₪{inv.amount.toLocaleString("he-IL")}</span>
-                      )}
-                      {inv.date && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(inv.date).toLocaleDateString("he-IL")}
-                        </span>
-                      )}
-                      {inv.category && (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category] || categoryColors["אחר"]}`}>
-                          <Tag className="h-2.5 w-2.5 inline ml-1" />
-                          {inv.category}
-                        </span>
-                      )}
-                    </div>
+                    {(isError || isDup) && inv.message ? (
+                      <p className={`text-xs ${isError ? "text-red-600" : "text-muted-foreground"}`}>{inv.message}</p>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        {inv.amount !== null && (
+                          <span className="font-bold">₪{inv.amount.toLocaleString("he-IL")}</span>
+                        )}
+                        {inv.date && (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(inv.date).toLocaleDateString("he-IL")}
+                          </span>
+                        )}
+                        {inv.category && (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${categoryColors[inv.category] || categoryColors["אחר"]}`}>
+                            <Tag className="h-2.5 w-2.5 inline ml-1" />
+                            {inv.category}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
