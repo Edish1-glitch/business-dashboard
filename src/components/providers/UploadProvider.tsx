@@ -64,67 +64,95 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     if (files.length === 0) return;
     setUploadState({ isUploading: true, progress: `מעבד ${files.length} קבצים...`, percent: 0, result: null, invoices: null });
 
-    try {
-      const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
+    // Upload ONE file per request instead of all files in a single request.
+    // A scanned multi-page bundle can be 90+ OCR pages (~minutes); one giant
+    // request exceeded the platform/proxy timeout and the stream was cut,
+    // showing "0 processed". Per-file requests each stay short (one file's
+    // pages), so any size batch completes; the floating widget shows overall
+    // "file X of N" progress and results aggregate across requests.
+    const allInvoices: InvoiceResult[] = [];
+    let hadNetworkError = false;
 
-      const response = await fetch("/api/upload-invoices", { method: "POST", body: formData });
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
+      const fileLabel = `קובץ ${fi + 1} מתוך ${files.length}`;
+      setUploadState((prev) => ({ ...prev, progress: `${fileLabel}: ${file.name}`, percent: (fi / files.length) * 100 }));
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setUploadState({ isUploading: false, progress: "", percent: 0, result: data.error || "שגיאה בעיבוד הקבצים", invoices: null });
-        return;
-      }
+      try {
+        const formData = new FormData();
+        formData.append("files", file);
+        const response = await fetch("/api/upload-invoices", { method: "POST", body: formData });
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let finalData: { invoices?: InvoiceResult[] } | null = null;
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          // Push a per-file error row so the run continues to the next file.
+          allInvoices.push({
+            id: null, page: 0, fileName: file.name, sourceFile: file.name,
+            vendor: null, amount: null, date: null, category: null, creditCardLast4: null,
+            duplicate: false, message: data.error || "שגיאה בעיבוד הקובץ",
+          });
+          continue;
+        }
 
-      if (reader) {
-        let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const msg = JSON.parse(line);
-              if (msg.type === "progress") {
-                setUploadState((prev) => ({
-                  ...prev,
-                  progress: msg.message,
-                  percent: msg.total > 0 ? (msg.current / msg.total) * 100 : 0,
-                }));
-              } else if (msg.type === "done") {
-                finalData = msg;
-              }
-            } catch { /* ignore parse errors */ }
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        if (reader) {
+          let buffer = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const msg = JSON.parse(line);
+                if (msg.type === "progress") {
+                  // Overall percent = whole files done + fraction of current file.
+                  const frac = msg.total > 0 ? msg.current / msg.total : 0;
+                  setUploadState((prev) => ({
+                    ...prev,
+                    progress: `${fileLabel}: ${msg.message}`,
+                    percent: ((fi + frac) / files.length) * 100,
+                  }));
+                } else if (msg.type === "done" && Array.isArray(msg.invoices)) {
+                  allInvoices.push(...msg.invoices);
+                }
+              } catch { /* ignore parse errors */ }
+            }
           }
         }
+      } catch {
+        hadNetworkError = true;
+        allInvoices.push({
+          id: null, page: 0, fileName: file.name, sourceFile: file.name,
+          vendor: null, amount: null, date: null, category: null, creditCardLast4: null,
+          duplicate: false, message: "שגיאת רשת בהעלאת הקובץ",
+        });
       }
+    }
 
-      const invoices = finalData?.invoices || [];
-      // Accurate breakdown: saved (new, has id, not a duplicate) vs duplicates vs
-      // failures. "0 processed" for a whole batch was masking per-file errors.
-      const saved = invoices.filter((r) => r.id && !r.duplicate).length;
-      const duplicates = invoices.filter((r) => r.duplicate).length;
-      const failed = invoices.filter((r) => !r.id && !r.duplicate).length;
+    // Accurate breakdown across ALL files: saved vs duplicates vs failures.
+    const saved = allInvoices.filter((r) => r.id && !r.duplicate).length;
+    const duplicates = allInvoices.filter((r) => r.duplicate).length;
+    const failed = allInvoices.filter((r) => !r.id && !r.duplicate).length;
+    let result: string;
+    if (hadNetworkError && saved === 0 && duplicates === 0) {
+      result = "שגיאה בהעלאת הקבצים";
+    } else {
       const parts = [`${saved} נשמרו`];
       if (duplicates > 0) parts.push(`${duplicates} כפילויות`);
       if (failed > 0) parts.push(`${failed} נכשלו`);
-      setUploadState({
-        isUploading: false,
-        progress: "",
-        percent: 0,
-        result: parts.join(" · "),
-        invoices,
-      });
-    } catch {
-      setUploadState({ isUploading: false, progress: "", percent: 0, result: "שגיאה בהעלאת הקבצים", invoices: null });
+      result = parts.join(" · ");
     }
+    setUploadState({
+      isUploading: false,
+      progress: "",
+      percent: 0,
+      result,
+      invoices: allInvoices,
+    });
   }, []);
 
   return (
