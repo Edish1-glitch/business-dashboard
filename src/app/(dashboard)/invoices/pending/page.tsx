@@ -1,7 +1,7 @@
 "use client";
 import { categoryColors } from "@/lib/category-colors";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   CheckCircle2,
   Download,
@@ -14,6 +14,7 @@ import {
   Trash2,
   Square,
   CheckSquare,
+  Circle,
   Search,
   ArrowUpDown,
   Clock,
@@ -22,11 +23,10 @@ import {
   TrendingDown,
   ChevronLeft,
   ChevronRight,
-  Filter,
+  SlidersHorizontal,
   Briefcase,
   Lock,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface Category {
   id: string;
@@ -69,6 +69,7 @@ export default function PendingInvoicesPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [bulkAction, setBulkAction] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false); // hidden until the user starts marking
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
@@ -79,7 +80,7 @@ export default function PendingInvoicesPage() {
   const [focusHandled, setFocusHandled] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null); // expanded card showing אשר/ערוך/פרטי
 
-  // range filters (collapsible panel)
+  // advanced filters (bottom sheet)
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategory, setFilterCategory] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -87,6 +88,18 @@ export default function PendingInvoicesPage() {
   const [amountMin, setAmountMin] = useState("");
   const [amountMax, setAmountMax] = useState("");
   const [amountCurrency, setAmountCurrency] = useState("");
+  const [timeChip, setTimeChip] = useState<"all" | "month" | "lastMonth" | "3months">("all"); // active quick time chip
+
+  // Long-press to enter multi-select (the bulk bar stays hidden until then).
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false); // guards the click that follows a long-press
+  const startLongPress = (id: string) => {
+    if (selectionMode) return;
+    longPressFired.current = false;
+    longPressTimer.current = setTimeout(() => { longPressFired.current = true; setSelectionMode(true); setSelected(new Set([id])); }, 450);
+  };
+  const cancelLongPress = () => { if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; } };
+  const exitSelection = () => { setSelectionMode(false); setSelected(new Set()); };
 
   // Revalidate in the background; only the first-ever load shows a spinner (loading init).
   const fetchData = useCallback(async () => {
@@ -174,7 +187,27 @@ export default function PendingInvoicesPage() {
   }, [invoices, emailFilter, filterCategory, searchQuery, sortKey, sortAsc, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
 
   const activeFilterCount = [filterCategory, dateFrom, dateTo, amountMin, amountMax, amountCurrency].filter(Boolean).length;
-  const clearFilters = () => { setFilterCategory(""); setDateFrom(""); setDateTo(""); setAmountMin(""); setAmountMax(""); setAmountCurrency(""); };
+  const clearFilters = () => { setFilterCategory(""); setDateFrom(""); setDateTo(""); setAmountMin(""); setAmountMax(""); setAmountCurrency(""); setTimeChip("all"); };
+
+  // Quick time chips — set the date range from a preset (highlights the chip).
+  const applyTimeChip = (chip: "all" | "month" | "lastMonth" | "3months") => {
+    setTimeChip(chip);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const now = new Date();
+    if (chip === "all") { setDateFrom(""); setDateTo(""); return; }
+    if (chip === "month") { setDateFrom(ymd(new Date(now.getFullYear(), now.getMonth(), 1))); setDateTo(ymd(now)); return; }
+    if (chip === "lastMonth") { setDateFrom(ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1))); setDateTo(ymd(new Date(now.getFullYear(), now.getMonth(), 0))); return; }
+    if (chip === "3months") { setDateFrom(ymd(new Date(now.getFullYear(), now.getMonth() - 2, 1))); setDateTo(ymd(now)); return; }
+  };
+
+  // Category chips — the categories that actually appear in the pending list, most-common first.
+  const presentCategories = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const inv of invoices) if (inv.category?.name) counts[inv.category.name] = (counts[inv.category.name] || 0) + 1;
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([name]) => name).slice(0, 6);
+  }, [invoices]);
+  const toggleCategoryChip = (name: string) => setFilterCategory((c) => (c === name ? "" : name));
 
   const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
@@ -288,9 +321,16 @@ export default function PendingInvoicesPage() {
   return (
     <div data-tour="pending-list" className="space-y-3 max-w-5xl mx-auto">
       {/* Header */}
-      <div>
-        <h2 className="text-lg sm:text-xl font-bold">ממתינות לאישור</h2>
-        <p className="text-xs sm:text-sm text-muted-foreground">{invoices.length} חשבוניות ממתינות</p>
+      <div className="flex items-end justify-between gap-2">
+        <div>
+          <h2 className="text-lg sm:text-xl font-bold">ממתינות לאישור</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">{invoices.length} חשבוניות ממתינות</p>
+        </div>
+        {!selectionMode && paginatedInvoices.length > 0 && (
+          <button onClick={() => setSelectionMode(true)} className="shrink-0 h-8 px-3 rounded-lg glass text-[12px] font-medium text-primary flex items-center gap-1.5">
+            <CheckSquare className="h-4 w-4" /> בחר
+          </button>
+        )}
       </div>
 
       {/* 1. Statistics strip */}
@@ -323,79 +363,112 @@ export default function PendingInvoicesPage() {
         </div>
       </div>
 
-      {/* 2. Search + Sort */}
+      {/* 2. Toolbar — search + sort + advanced */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
-            placeholder="חיפוש לפי ספק, קובץ או קטגוריה..."
+            placeholder="חיפוש לפי ספק או קטגוריה..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-9 rounded-lg border border-input bg-background pr-8 pl-3 text-[16px] sm:text-xs"
+            className="w-full h-10 rounded-xl glass border-none pr-9 pl-3 text-[16px] sm:text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-violet-400/40"
           />
         </div>
-        {/* Sort dropdown + direction + filter toggle */}
-        <div className="flex items-center gap-1 shrink-0">
-          <div className="flex items-center gap-1 h-9 rounded-lg bg-muted/50 pr-2">
-            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="h-9 bg-transparent text-[11px] sm:text-xs text-foreground border-none cursor-pointer focus:outline-none"
-              title="מיין לפי"
-            >
-              <option value="created">מיין: חדש</option>
-              <option value="date">מיין: תאריך</option>
-              <option value="amount">מיין: סכום</option>
-              <option value="vendor">מיין: ספק</option>
-            </select>
-            <button onClick={() => setSortAsc((v) => !v)} className="text-muted-foreground hover:text-foreground text-sm w-5 shrink-0" title={sortAsc ? "עולה" : "יורד"}>
-              {sortAsc ? "↑" : "↓"}
-            </button>
-          </div>
-          <button
-            onClick={() => setShowFilters((s) => !s)}
-            className={`h-9 px-2.5 rounded-lg text-[11px] sm:text-xs flex items-center gap-1 transition-colors shrink-0 ${showFilters || activeFilterCount > 0 ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}
+        <div className="flex items-center gap-1 h-10 rounded-xl glass px-2 shrink-0">
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="h-10 bg-transparent text-[12px] sm:text-sm text-foreground border-none cursor-pointer focus:outline-none"
+            title="מיין לפי"
           >
-            <Filter className="h-3.5 w-3.5" /> סינון{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+            <option value="created">חדש</option>
+            <option value="date">תאריך</option>
+            <option value="amount">סכום</option>
+            <option value="vendor">ספק</option>
+          </select>
+          <button onClick={() => setSortAsc((v) => !v)} className="text-muted-foreground hover:text-foreground text-base w-5 shrink-0" title={sortAsc ? "עולה" : "יורד"}>
+            {sortAsc ? "↑" : "↓"}
           </button>
         </div>
+        <button
+          onClick={() => setShowFilters(true)}
+          className={`relative h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${activeFilterCount > 0 ? "bg-primary text-primary-foreground" : "glass text-muted-foreground"}`}
+          title="סינון מתקדם"
+          aria-label="סינון מתקדם"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          {activeFilterCount > 0 && <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">{activeFilterCount}</span>}
+        </button>
       </div>
 
-      {/* Collapsible filter panel: account, category, date range, amount range + currency */}
+      {/* Quick filter chips — time presets + common categories */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-2 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {(["all", "month", "lastMonth", "3months"] as const).map((key) => {
+          const label = { all: "הכל", month: "החודש", lastMonth: "החודש שעבר", "3months": "3 חודשים" }[key];
+          const active = key === "all" ? (!dateFrom && !dateTo) : timeChip === key;
+          return (
+            <button
+              key={key}
+              onClick={() => applyTimeChip(key)}
+              className={`shrink-0 h-8 px-3.5 rounded-full text-[12px] font-medium transition-colors ${active ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25" : "glass text-muted-foreground"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+        {presentCategories.length > 0 && <span className="shrink-0 w-px h-5 bg-border/60 mx-0.5" />}
+        {presentCategories.map((name) => (
+          <button
+            key={name}
+            onClick={() => toggleCategoryChip(name)}
+            className={`shrink-0 h-8 px-3.5 rounded-full text-[12px] font-medium transition-colors ${filterCategory === name ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25" : "glass text-muted-foreground"}`}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+
+      {/* Active-filter summary */}
+      {(searchQuery || activeFilterCount > 0 || emailFilter) && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[12px] text-muted-foreground">{filteredInvoices.length} תוצאות</span>
+          <button onClick={() => { clearFilters(); setEmailFilter(""); setSearchQuery(""); }} className="text-[12px] text-red-500 hover:text-red-600 flex items-center gap-1">
+            <X className="h-3.5 w-3.5" /> נקה
+          </button>
+        </div>
+      )}
+
+      {/* Advanced filter — bottom sheet (mobile) / centered card (desktop) */}
       {showFilters && (
-        <div className="rounded-xl glass p-3 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Date range */}
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1 flex items-center gap-1"><Calendar className="h-3 w-3" /> טווח תאריכים</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <div>
-                  <span className="text-[10px] text-muted-foreground mb-0.5 block">מתאריך</span>
-                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-muted-foreground mb-0.5 block">עד תאריך</span>
-                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
+        <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center" onClick={() => setShowFilters(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+          <div
+            className="relative w-full sm:max-w-md glass rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto"
+            style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold flex items-center gap-2"><SlidersHorizontal className="h-4 w-4" /> סינון מתקדם</h3>
+              <button onClick={() => setShowFilters(false)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-4">
+              {/* Date range */}
+              <div>
+                <label className="text-[12px] font-semibold mb-1.5 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> טווח תאריכים</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setTimeChip("all"); }} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
+                  <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setTimeChip("all"); }} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
                 </div>
               </div>
-            </div>
-            {/* Amount range + currency */}
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">טווח סכומים</label>
-              <div className="flex gap-1.5">
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] text-muted-foreground mb-0.5 block">מסכום</span>
-                  <input type="number" inputMode="decimal" placeholder="0" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] text-muted-foreground mb-0.5 block">עד סכום</span>
-                  <input type="number" inputMode="decimal" placeholder="ללא הגבלה" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]" />
-                </div>
-                <div className="w-[56px] shrink-0">
-                  <span className="text-[10px] text-muted-foreground mb-0.5 block">מטבע</span>
-                  <select value={amountCurrency} onChange={(e) => setAmountCurrency(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background text-[13px] text-center">
+              {/* Amount range + currency */}
+              <div>
+                <label className="text-[12px] font-semibold mb-1.5 block">טווח סכומים</label>
+                <div className="flex gap-2">
+                  <input type="number" inputMode="decimal" placeholder="מסכום" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="flex-1 min-w-0 h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
+                  <input type="number" inputMode="decimal" placeholder="עד סכום" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="flex-1 min-w-0 h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
+                  <select value={amountCurrency} onChange={(e) => setAmountCurrency(e.target.value)} className="w-16 shrink-0 h-11 rounded-xl border border-input bg-background text-[14px] text-center">
                     <option value="">הכל</option>
                     <option value="ILS">₪</option>
                     <option value="USD">$</option>
@@ -404,57 +477,54 @@ export default function PendingInvoicesPage() {
                   </select>
                 </div>
               </div>
+              {/* Category */}
+              {categories.length > 0 && (
+                <div>
+                  <label className="text-[12px] font-semibold mb-1.5 block">קטגוריה</label>
+                  <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]">
+                    <option value="">כל הקטגוריות</option>
+                    {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {/* Email account */}
+              {emailAccounts.length > 0 && (
+                <div>
+                  <label className="text-[12px] font-semibold mb-1.5 flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> חשבון אימייל</label>
+                  <select value={emailFilter} onChange={(e) => setEmailFilter(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]">
+                    <option value="">כל החשבונות</option>
+                    {emailAccounts.map((email) => <option key={email} value={email}>{email}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
-            {/* Category */}
-            {categories.length > 0 && (
-              <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">קטגוריה</label>
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]">
-                  <option value="">כל הקטגוריות</option>
-                  {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                </select>
-              </div>
-            )}
-            {/* Email account */}
-            {emailAccounts.length > 0 && (
-              <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 flex items-center gap-1"><Mail className="h-3 w-3" /> חשבון אימייל</label>
-                <select value={emailFilter} onChange={(e) => setEmailFilter(e.target.value)} className="w-full h-9 rounded-lg border border-input bg-background px-2 text-[13px]">
-                  <option value="">כל החשבונות</option>
-                  {emailAccounts.map((email) => <option key={email} value={email}>{email}</option>)}
-                </select>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">{filteredInvoices.length} תוצאות</span>
-            {(activeFilterCount > 0 || emailFilter) && (
-              <button onClick={() => { clearFilters(); setEmailFilter(""); }} className="text-[11px] text-red-500 hover:text-red-700 flex items-center gap-1">
-                <X className="h-3 w-3" /> נקה סינון
-              </button>
-            )}
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => { clearFilters(); setEmailFilter(""); }} className="flex-1 h-11 rounded-xl glass text-[14px] font-medium text-muted-foreground">נקה הכל</button>
+              <button onClick={() => setShowFilters(false)} className="flex-[2] h-11 rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold">הצג {filteredInvoices.length} תוצאות</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 3. Sticky bulk action bar */}
-      <div className="sticky top-16 z-30 bg-background/90 backdrop-blur-sm py-1.5 -mx-2 px-2 sm:-mx-4 sm:px-4 flex items-center gap-2 flex-wrap">
-        <Button variant="outline" size="sm" onClick={toggleSelectAll} className="gap-1.5 h-7 text-[11px]">
-          {allSelected ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
-          {allSelected ? "בטל" : "בחר הכל"}
-        </Button>
-        {selected.size > 0 && (
-          <>
-            <span className="text-[11px] text-muted-foreground">{selected.size} נבחרו</span>
-            <Button size="sm" onClick={bulkApprove} disabled={bulkAction} className="gap-1 bg-emerald-600 hover:bg-emerald-700 h-7 text-[11px]">
-              {bulkAction ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCheck className="h-3 w-3" />}
-              אשר
-            </Button>
-            <Button variant="outline" size="sm" onClick={bulkDelete} disabled={bulkAction} className="gap-1 text-red-600 border-red-200 hover:bg-red-50 h-7 text-[11px]">
-              {bulkAction ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-              מחק
-            </Button>
-            <Button variant="outline" size="sm" disabled={bulkAction} onClick={async () => {
+      {/* Selection bar — hidden until a long-press starts multi-select */}
+      {selectionMode && (
+        <div className="sticky top-16 z-30 glass rounded-2xl px-2.5 py-2 flex items-center gap-2 shadow-lg">
+          <button onClick={exitSelection} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted shrink-0" aria-label="בטל בחירה"><X className="h-4 w-4" /></button>
+          <button onClick={toggleSelectAll} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted shrink-0" title={allSelected ? "בטל הכל" : "בחר הכל"} aria-label={allSelected ? "בטל הכל" : "בחר הכל"}>
+            {allSelected ? <CheckSquare className="h-[18px] w-[18px] text-primary" /> : <Square className="h-[18px] w-[18px]" />}
+          </button>
+          <span className="text-[12px] text-muted-foreground shrink-0 whitespace-nowrap">{selected.size} נבחרו</span>
+          <div className="flex-1" />
+          <button onClick={bulkApprove} disabled={bulkAction || selected.size === 0} className="h-8 px-3 rounded-lg bg-emerald-600 text-white text-[12px] font-semibold flex items-center gap-1 disabled:opacity-40 shrink-0">
+            {bulkAction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />} אשר
+          </button>
+          <button onClick={bulkDelete} disabled={bulkAction || selected.size === 0} className="h-8 w-8 rounded-lg glass text-red-500 flex items-center justify-center disabled:opacity-40 shrink-0" aria-label="מחק">
+            {bulkAction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            disabled={bulkAction || selected.size === 0}
+            aria-label="הורד"
+            onClick={async () => {
               setBulkAction(true);
               try {
                 const res = await fetch("/api/invoices/bulk-download", {
@@ -481,16 +551,13 @@ export default function PendingInvoicesPage() {
               } finally {
                 setBulkAction(false);
               }
-            }} className="gap-1 h-7 text-[11px]">
-              {bulkAction ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-              הורד הכל
-            </Button>
-          </>
-        )}
-        {searchQuery && (
-          <span className="text-[11px] text-muted-foreground mr-auto">{filteredInvoices.length} תוצאות</span>
-        )}
-      </div>
+            }}
+            className="h-8 w-8 rounded-lg glass text-muted-foreground flex items-center justify-center disabled:opacity-40 shrink-0"
+          >
+            {bulkAction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+      )}
 
       {/* Preview modal */}
       {previewId && (() => {
@@ -524,38 +591,68 @@ export default function PendingInvoicesPage() {
       <div className="grid gap-2">
         {paginatedInvoices.map((inv) => {
           const isEditing = editingId === inv.id;
+          const isSelected = selected.has(inv.id);
           const waitTime = getWaitingTime(inv.createdAt);
 
           return (
             <div
               key={inv.id}
               id={`inv-${inv.id}`}
-              className={`glass rounded-2xl overflow-hidden transition-all ${openId === inv.id ? "ring-2 ring-violet-400/40" : ""}`}
+              onTouchStart={() => { if (!isEditing) startLongPress(inv.id); }}
+              onTouchEnd={cancelLongPress}
+              onTouchMove={cancelLongPress}
+              onContextMenu={(e) => { if (!selectionMode && !isEditing) e.preventDefault(); }}
+              className={`glass rounded-2xl overflow-hidden transition-all ${openId === inv.id && !selectionMode ? "ring-2 ring-violet-400/40" : ""} ${selectionMode && isSelected ? "ring-2 ring-emerald-500/70" : ""}`}
             >
-              {isEditing ? (
-                /* ===== EDIT MODE ===== */
-                <div className="flex flex-col md:flex-row-reverse">
-                  <div className="md:w-1/2 bg-white border-b md:border-b-0 md:border-r border-border overflow-auto max-h-[500px]">
-                    {inv.fileName.endsWith(".html") ? (
-                      <iframe src={`/api/invoices/${inv.id}/preview`} className="w-full h-[400px]" sandbox="allow-same-origin" title="preview" />
-                    ) : (
-                      <img src={`/api/invoices/${inv.id}/preview`} alt="preview" className="w-full" draggable={false} />
-                    )}
+              {selectionMode ? (
+                /* ===== SELECTABLE ROW (multi-select) ===== */
+                <div className="p-3 flex items-center gap-3 cursor-pointer select-none" onClick={() => toggleSelect(inv.id)}>
+                  <div className="shrink-0">
+                    {isSelected ? <CheckCircle2 className="h-6 w-6 text-emerald-500" /> : <Circle className="h-6 w-6 text-muted-foreground/40" />}
                   </div>
-                  <div className="md:w-1/2 p-3 sm:p-4 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="shrink-0 w-11 h-11 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
+                    {inv.fileName.endsWith(".html") ? <Mail className="h-5 w-5 text-muted-foreground/40" /> : <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-[14px] truncate">{inv.vendor || inv.fileName}</span>
+                      {inv.amount !== null ? <span className="font-black text-[15px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
+                      {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
+                      {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL")}</span>}
+                      {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
+                    </div>
+                  </div>
+                </div>
+              ) : isEditing ? (
+                /* ===== EDIT (spacious inline card) ===== */
+                <div className="flex flex-col md:flex-row-reverse">
+                  <div className="relative md:w-2/5 bg-white border-b md:border-b-0 md:border-r border-border/60 h-44 md:h-auto md:max-h-[560px] overflow-hidden md:overflow-auto flex items-start justify-center shrink-0">
+                    {inv.fileName.endsWith(".html") ? (
+                      <iframe src={`/api/invoices/${inv.id}/preview`} className="w-full h-44 md:h-[560px] pointer-events-none" sandbox="allow-same-origin" title="preview" />
+                    ) : (
+                      <img src={`/api/invoices/${inv.id}/preview`} alt="preview" className="w-full h-full md:h-auto object-cover object-top" draggable={false} />
+                    )}
+                    {/* Tap to open the full preview */}
+                    <button type="button" onClick={() => setPreviewId(inv.id)} className="absolute inset-0 flex items-end justify-center pb-1.5" aria-label="הצג מלא">
+                      <span className="px-2.5 py-1 rounded-full bg-black/55 text-white text-[10px] font-medium backdrop-blur-sm">הקש להגדלה</span>
+                    </button>
+                  </div>
+                  <div className="md:w-3/5 p-4 sm:p-5 space-y-4">
+                    <div className="space-y-3.5">
                       <div>
-                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">ספק</label>
-                        <input type="text" value={editData.vendor || ""} onChange={(e) => setEditData({ ...editData, vendor: e.target.value })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
+                        <label className="text-[12px] font-semibold mb-1.5 block">ספק</label>
+                        <input type="text" value={editData.vendor || ""} onChange={(e) => setEditData({ ...editData, vendor: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3.5 text-[15px]" />
                       </div>
-                      <div className="sm:col-span-2">
-                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">סכום</label>
-                        <div className="flex gap-1.5">
-                          <input type="number" step="0.01" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || null })} className="flex-1 min-w-0 h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
+                      <div>
+                        <label className="text-[12px] font-semibold mb-1.5 block">סכום</label>
+                        <div className="flex gap-2">
+                          <input type="number" step="0.01" value={editData.amount ?? ""} onChange={(e) => setEditData({ ...editData, amount: e.target.value === "" ? null : parseFloat(e.target.value) })} className="flex-1 min-w-0 h-11 rounded-xl border border-input bg-background px-3.5 text-[17px] font-bold tnum" />
                           <select
                             value={editData.currency || "ILS"}
                             onChange={(e) => setEditData({ ...editData, currency: e.target.value })}
-                            className="h-9 w-[60px] shrink-0 rounded-lg border border-input bg-background text-[16px] sm:text-sm text-center font-medium"
+                            className="h-11 w-[64px] shrink-0 rounded-xl border border-input bg-background text-[16px] text-center font-bold"
                           >
                             <option value="ILS">₪</option>
                             <option value="USD">$</option>
@@ -564,64 +661,68 @@ export default function PendingInvoicesPage() {
                           </select>
                         </div>
                       </div>
-                      <div>
-                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">תאריך</label>
-                        <input type="date" value={typeof editData.date === "string" ? editData.date : ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="text-[12px] font-semibold mb-1.5 block">תאריך</label>
+                          <input type="date" value={typeof editData.date === "string" ? editData.date : ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
+                        </div>
+                        <div>
+                          <label className="text-[12px] font-semibold mb-1.5 block">4 ספרות כרטיס</label>
+                          <input type="text" inputMode="numeric" maxLength={4} value={editData.creditCardLast4 || ""} onChange={(e) => setEditData({ ...editData, creditCardLast4: e.target.value.replace(/\D/g, "") })} className="w-full h-11 rounded-xl border border-input bg-background px-3.5 text-[15px]" placeholder="1234" />
+                        </div>
                       </div>
                       <div>
-                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">4 ספרות כרטיס</label>
-                        <input type="text" maxLength={4} value={editData.creditCardLast4 || ""} onChange={(e) => setEditData({ ...editData, creditCardLast4: e.target.value.replace(/\D/g, "") })} className="w-full h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" placeholder="1234" />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">קטגוריה</label>
-                        <div className="flex gap-1.5">
-                          <select value={editData.category?.id || ""} onChange={(e) => { const cat = categories.find((c) => c.id === e.target.value); setEditData({ ...editData, category: cat || null }); }} className="flex-1 h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm">
+                        <label className="text-[12px] font-semibold mb-1.5 block">קטגוריה</label>
+                        <div className="flex gap-2">
+                          <select value={editData.category?.id || ""} onChange={(e) => { const cat = categories.find((c) => c.id === e.target.value); setEditData({ ...editData, category: cat || null }); }} className="flex-1 h-11 rounded-xl border border-input bg-background px-3 text-[15px]">
                             <option value="">ללא קטגוריה</option>
                             {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                           </select>
-                          <Button variant="outline" size="sm" onClick={() => setShowNewCategory(!showNewCategory)} className="h-8 w-8 p-0 shrink-0"><Plus className="h-3.5 w-3.5" /></Button>
+                          <button type="button" onClick={() => setShowNewCategory(!showNewCategory)} className="h-11 w-11 shrink-0 rounded-xl glass flex items-center justify-center"><Plus className="h-4 w-4" /></button>
                         </div>
                         {showNewCategory && (
-                          <div className="flex gap-1.5 mt-1.5">
-                            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="שם קטגוריה חדשה" className="flex-1 h-9 rounded-lg border border-input bg-background px-2.5 text-[16px] sm:text-sm" />
-                            <Button size="sm" className="h-8" onClick={addCategory} disabled={addingCategory}>{addingCategory ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "הוסף"}</Button>
+                          <div className="flex gap-2 mt-2">
+                            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="שם קטגוריה חדשה" className="flex-1 h-11 rounded-xl border border-input bg-background px-3.5 text-[15px]" />
+                            <button onClick={addCategory} disabled={addingCategory} className="h-11 px-4 rounded-xl bg-primary text-primary-foreground text-[14px] font-medium shrink-0">{addingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : "הוסף"}</button>
                           </div>
                         )}
                       </div>
                       {/* Business / Private classification */}
-                      <div className="sm:col-span-2">
-                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">סיווג</label>
-                        <div className="grid grid-cols-2 gap-1.5">
+                      <div>
+                        <label className="text-[12px] font-semibold mb-1.5 block">סיווג</label>
+                        <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={() => setEditData({ ...editData, isBusiness: true })}
-                            className={`h-9 rounded-lg border text-[13px] font-medium flex items-center justify-center gap-1.5 transition-colors ${(editData.isBusiness ?? true) ? "bg-emerald-600 text-white border-emerald-600" : "bg-background text-muted-foreground border-input hover:bg-muted"}`}
+                            className={`h-11 rounded-xl border text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${(editData.isBusiness ?? true) ? "bg-emerald-600 text-white border-emerald-600" : "bg-background text-muted-foreground border-input"}`}
                           >
-                            <Briefcase className="h-3.5 w-3.5" /> עסקי
+                            <Briefcase className="h-4 w-4" /> עסקי
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditData({ ...editData, isBusiness: false })}
-                            className={`h-9 rounded-lg border text-[13px] font-medium flex items-center justify-center gap-1.5 transition-colors ${!(editData.isBusiness ?? true) ? "bg-slate-600 text-white border-slate-600" : "bg-background text-muted-foreground border-input hover:bg-muted"}`}
+                            className={`h-11 rounded-xl border text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${!(editData.isBusiness ?? true) ? "bg-slate-600 text-white border-slate-600" : "bg-background text-muted-foreground border-input"}`}
                           >
-                            <Lock className="h-3.5 w-3.5" /> פרטי
+                            <Lock className="h-4 w-4" /> פרטי
                           </button>
                         </div>
                         {!(editData.isBusiness ?? true) && (
-                          <p className="text-[10px] text-muted-foreground mt-1">הוצאה פרטית — לא מתקזזת ולא נשלחת לרו&quot;ח</p>
+                          <p className="text-[11px] text-muted-foreground mt-1.5">הוצאה פרטית — לא מתקזזת ולא נשלחת לרו&quot;ח</p>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                      <Button size="sm" className="gap-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveFromEdit(inv.id)} disabled={approving === inv.id}>
-                        {approving === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />} אשר
-                      </Button>
-                      <Button variant="outline" size="sm" className="gap-1 h-8 text-xs" onClick={() => saveEdit(inv.id)}>שמור</Button>
-                      <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setEditingId(null)}><X className="h-3 w-3 ml-0.5" /> ביטול</Button>
-                      <div className="flex-1" />
-                      <Button variant="ghost" size="sm" className="h-8 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 gap-1" onClick={() => deleteOne(inv.id)} disabled={deleting === inv.id}>
-                        {deleting === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />} מחק
-                      </Button>
+                    {/* Actions */}
+                    <div className="space-y-2 pt-1">
+                      <button onClick={() => approveFromEdit(inv.id)} disabled={approving === inv.id} className="w-full h-12 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                        {approving === inv.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />} אשר ושמור
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => saveEdit(inv.id)} className="flex-1 h-10 rounded-xl glass text-[14px] font-medium">שמור בלבד</button>
+                        <button onClick={() => setEditingId(null)} className="flex-1 h-10 rounded-xl glass text-[14px] font-medium text-muted-foreground">ביטול</button>
+                        <button onClick={() => deleteOne(inv.id)} disabled={deleting === inv.id} className="h-10 w-10 shrink-0 rounded-xl glass text-red-500 flex items-center justify-center" aria-label="מחק">
+                          {deleting === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -629,10 +730,10 @@ export default function PendingInvoicesPage() {
                 /* ===== FOCUSED (mockup) — thumbnail + content + אשר/ערוך/פרטי ===== */
                 <div className="p-3">
                   <div className="flex items-center gap-3">
-                    <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-12 h-12 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
+                    <button onClick={() => { if (longPressFired.current) return; setPreviewId(inv.id); }} className="shrink-0 w-12 h-12 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
                       {inv.fileName.endsWith(".html") ? <Mail className="h-5 w-5 text-muted-foreground/40" /> : <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />}
                     </button>
-                    <button onClick={() => setOpenId(null)} className="flex-1 min-w-0 text-start">
+                    <button onClick={() => { if (longPressFired.current) return; setOpenId(null); }} className="flex-1 min-w-0 text-start">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-[14px] truncate">{inv.vendor || inv.fileName}</span>
                         {inv.amount !== null ? <span className="font-black text-[16px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
@@ -656,10 +757,10 @@ export default function PendingInvoicesPage() {
               ) : (
                 /* ===== COMPACT (mockup) — thumbnail + content + green approve circle ===== */
                 <div className="p-3 flex items-center gap-3">
-                  <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-11 h-11 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
+                  <button onClick={() => { if (longPressFired.current) return; setPreviewId(inv.id); }} className="shrink-0 w-11 h-11 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
                     {inv.fileName.endsWith(".html") ? <Mail className="h-5 w-5 text-muted-foreground/40" /> : <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />}
                   </button>
-                  <button onClick={() => setOpenId(inv.id)} className="flex-1 min-w-0 text-start">
+                  <button onClick={() => { if (longPressFired.current) return; setOpenId(inv.id); }} className="flex-1 min-w-0 text-start">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-bold text-[14px] truncate">{inv.vendor || inv.fileName}</span>
                       {inv.amount !== null ? <span className="font-black text-[15px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
@@ -671,7 +772,7 @@ export default function PendingInvoicesPage() {
                       {waitTime && <span className="text-amber-500">{waitTime}</span>}
                     </div>
                   </button>
-                  <button onClick={() => approveOne(inv.id)} disabled={approving === inv.id} aria-label="אשר" className="shrink-0 w-9 h-9 rounded-xl text-white flex items-center justify-center" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                  <button onClick={() => { if (longPressFired.current) return; approveOne(inv.id); }} disabled={approving === inv.id} aria-label="אשר" className="shrink-0 w-9 h-9 rounded-xl text-white flex items-center justify-center" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
                     {approving === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-[18px] w-[18px]" strokeWidth={2.6} />}
                   </button>
                 </div>

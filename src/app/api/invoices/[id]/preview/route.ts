@@ -3,13 +3,7 @@ import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/api-auth";
 import { readFile } from "fs/promises";
 import { downloadFromR2 } from "@/lib/r2";
-import { execFile } from "child_process";
-import { promisify } from "util";
-import { writeFile, mkdtemp, rm } from "fs/promises";
-import path from "path";
-import os from "os";
-
-const execFileAsync = promisify(execFile);
+import { getPdfPreviewPng } from "@/lib/preview-cache";
 
 /**
  * Get file buffer from R2, DB (base64), or local filesystem.
@@ -42,10 +36,9 @@ export async function GET(
   }
 
   try {
-    const fileBuffer = await getFileBuffer(invoice);
-
-    // Inline HTML email - return as HTML for iframe rendering
+    // Inline HTML email — return as HTML for iframe rendering (cheap, no render)
     if (invoice.filePath === "inline-html" || invoice.fileName.endsWith(".html")) {
+      const fileBuffer = await getFileBuffer(invoice);
       return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
@@ -54,32 +47,25 @@ export async function GET(
       });
     }
 
-    // If it's an image, return directly
+    // Already an image — return directly (cheap, no render)
     const isImage = invoice.fileName.match(/\.(jpg|jpeg|png|webp)$/i);
     if (isImage) {
+      const fileBuffer = await getFileBuffer(invoice);
       return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           "Content-Type": "image/png",
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "public, max-age=31536000, immutable",
         },
       });
     }
 
-    // Convert PDF to PNG using pdftoppm
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "findash-preview-"));
-    const pdfPath = path.join(tmpDir, "input.pdf");
-    const imgPrefix = path.join(tmpDir, "page");
-
-    await writeFile(pdfPath, fileBuffer);
-    await execFileAsync("pdftoppm", ["-png", "-r", "200", "-singlefile", pdfPath, imgPrefix]);
-
-    const imgBuffer = await readFile(path.join(tmpDir, "page.png"));
-    await rm(tmpDir, { recursive: true, force: true });
-
-    return new NextResponse(new Uint8Array(imgBuffer), {
+    // PDF — render to PNG once, then serve the cached copy on every later request.
+    const png = await getPdfPreviewPng(invoice);
+    return new NextResponse(new Uint8Array(png), {
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=3600",
+        // Immutable: a given invoice's rendered page never changes.
+        "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
   } catch {

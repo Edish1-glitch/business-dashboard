@@ -39,7 +39,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#6d28d9",
+  // Single theme-color meta; ThemeProvider updates its content to match the
+  // resolved theme (dark → #0e0f15, light → #f6f6fb) so the iOS PWA status bar
+  // never shows a white strip over the dark app. SSR default is light; the
+  // effect corrects it on launch. media-query defaults cover the pre-JS frame.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f6fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0f15" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

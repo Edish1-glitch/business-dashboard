@@ -19,6 +19,21 @@ function applyTheme(theme: Theme) {
   } else {
     document.documentElement.classList.remove("dark");
   }
+
+  // Keep the iOS PWA status-bar colour in sync with the *resolved* theme.
+  // Pin every theme-color meta (Next emits one per media query) to the same
+  // colour so the bar matches even when the in-app theme overrides the system
+  // scheme — no more white strip over the dark app.
+  const color = isDark ? "#0e0f15" : "#f6f6fb";
+  const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
+  if (metas.length === 0) {
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    meta.content = color;
+    document.head.appendChild(meta);
+  } else {
+    metas.forEach((m) => m.setAttribute("content", color));
+  }
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
