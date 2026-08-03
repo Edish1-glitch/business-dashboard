@@ -28,8 +28,8 @@ export function Onboarding() {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
-      <div className="glass rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm overflow-hidden">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="glass rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
         {/* gradient header */}
         <div className="relative hero-grad hero-gloss px-6 pt-8 pb-6 text-white text-center">
           <button

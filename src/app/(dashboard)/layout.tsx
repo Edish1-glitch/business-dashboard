@@ -18,8 +18,8 @@ export default function DashboardLayout({
       <Sidebar />
       <div className="md:mr-64 min-h-screen flex flex-col">
         <Header />
-        {/* pb-28 clears the floating mobile bottom nav */}
-        <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 pb-28 md:pb-8">{children}</main>
+        {/* pb-24 clears the mobile bottom tab bar */}
+        <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 pb-24 md:pb-8">{children}</main>
       </div>
       <SyncFloatingWidget />
       <UploadFloatingWidget />
