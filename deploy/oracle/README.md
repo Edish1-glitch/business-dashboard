@@ -120,6 +120,19 @@ cd business-dashboard && git pull && docker compose -f deploy/oracle/docker-comp
 - Logs: `docker compose logs -f app`
 - Resource use: `docker stats`
 
+## ARM64 validation (done locally on Apple Silicon)
+The exact image was built and tested on an aarch64 Docker daemon:
+- Image builds clean on ARM64 (Debian arm64 packages for chromium / tesseract /
+  poppler all resolve).
+- In-container smoke test passed the full heavy pipeline: **Chromium HTML→PDF →
+  poppler PDF→PNG → tesseract OCR** read the text back; `tesseract --list-langs`
+  shows `eng heb`. `puppeteer-core → chromium` also verified.
+- **Fix found & applied:** the `--single-process` / `--no-zygote` Chromium flags
+  (a Render-512MB memory hack) crash Chromium with SIGTRAP on ARM64. They're now
+  gated behind `CHROMIUM_LOW_MEMORY=1`; with real RAM (Oracle) the stable
+  multi-process mode runs by default — no env var needed. `docker-compose.yml`
+  gives Chromium `shm_size: 512mb`.
+
 ## Notes / caveats
 - **Heap:** `docker-compose.yml` sets `--max-old-space-size=2048` (vs Render's
   350). Fine for 12 GB. Raise if ever needed.

@@ -48,6 +48,12 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
 }
 
 async function convertHtmlToPdf(html: string): Promise<Buffer> {
+  // --single-process / --no-zygote cut peak memory but make Chromium unstable —
+  // on some platforms `page.pdf()` crashes with SIGTRAP under single-process
+  // (verified on ARM64). They're only worth it on a tiny box (Render 512MB); set
+  // CHROMIUM_LOW_MEMORY=1 there. Everywhere with real RAM (Oracle 12GB) runs the
+  // stable multi-process mode by default.
+  const lowMem = process.env.CHROMIUM_LOW_MEMORY === "1";
   const browser: Browser = await puppeteer.launch({
     headless: true,
     executablePath: getChromePath(),
@@ -56,9 +62,8 @@ async function convertHtmlToPdf(html: string): Promise<Buffer> {
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
-      "--single-process",
-      "--no-zygote",
       "--disable-extensions",
+      ...(lowMem ? ["--single-process", "--no-zygote"] : []),
     ],
   });
 
