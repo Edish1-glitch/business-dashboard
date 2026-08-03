@@ -75,7 +75,10 @@ export function Header() {
         className="peer sr-only"
       />
 
-      <header className="glass-header sticky top-0 z-40 flex items-center h-16 px-4 md:px-6">
+      <header
+        className="glass-header sticky top-0 z-40 flex items-center px-4 md:px-6"
+        style={{ height: "calc(4rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}
+      >
         {/* <label> for native touch handling - Safari always responds to label taps */}
         <label
           htmlFor={checkboxId}
@@ -162,6 +165,7 @@ export function Header() {
       {/* Sidebar - direct sibling of checkbox so peer-checked works */}
       <nav
         className="fixed inset-y-0 right-0 z-50 w-72 bg-sidebar shadow-2xl flex flex-col translate-x-full peer-checked:translate-x-0 transition-transform duration-200 md:hidden"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
         role="dialog"
       >
         <div className="flex items-center justify-between h-16 px-4">

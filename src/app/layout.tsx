@@ -27,7 +27,11 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "FinDash",
-    statusBarStyle: "default",
+    // black-translucent: the iOS standalone PWA status bar goes transparent and
+    // the app's own (dark) background shows through with white icons — a dark
+    // status bar on the dark app. (theme-color does NOT control this on iOS.)
+    // The Header pads env(safe-area-inset-top) so content isn't hidden under it.
+    statusBarStyle: "black-translucent",
   },
   icons: {
     icon: [
