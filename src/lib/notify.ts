@@ -1,20 +1,8 @@
 import { prisma } from "@/lib/db";
 import { sendPushToUser } from "@/lib/push";
+import { buildNewInvoicePush, formatInvoiceAmount, type NewInvoiceInfo } from "@/lib/notify-format";
 
-export interface NewInvoiceInfo {
-  id: string;
-  vendor: string | null;
-  amount: number | null;
-  currency: string | null;
-}
-
-const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", ILS: "₪" };
-
-function formatAmount(amount: number | null, currency: string | null): string {
-  if (amount == null) return "";
-  const sym = CURRENCY_SYMBOL[currency || "ILS"] || "₪";
-  return `${sym}${amount.toLocaleString("he-IL", { maximumFractionDigits: 2 })}`;
-}
+export type { NewInvoiceInfo };
 
 /**
  * Persist an in-app notification row for a newly ingested invoice (feeds the
@@ -23,7 +11,7 @@ function formatAmount(amount: number | null, currency: string | null): string {
  */
 export async function recordNewInvoiceNotification(userId: string, invoice: NewInvoiceInfo): Promise<void> {
   const vendor = invoice.vendor || "חשבונית חדשה";
-  const amountStr = formatAmount(invoice.amount, invoice.currency);
+  const amountStr = formatInvoiceAmount(invoice.amount, invoice.currency);
   try {
     await prisma.notification.create({
       data: {
@@ -40,32 +28,14 @@ export async function recordNewInvoiceNotification(userId: string, invoice: NewI
 }
 
 /**
- * Send a Web Push for invoices discovered in a single sync run.
- * One invoice → a focused push that deep-links to it; several → one batched push.
- * Never throws (push failures must not break the sync flow).
+ * Send a Web Push for invoices discovered in a single sync run (single focused
+ * or batched). Never throws — push failures must not break the sync flow.
  */
 export async function pushNewInvoices(userId: string, invoices: NewInvoiceInfo[]): Promise<void> {
-  if (invoices.length === 0) return;
+  const payload = buildNewInvoicePush(invoices);
+  if (!payload) return;
   try {
-    if (invoices.length === 1) {
-      const inv = invoices[0];
-      const vendor = inv.vendor || "חשבונית חדשה";
-      const amountStr = formatAmount(inv.amount, inv.currency);
-      await sendPushToUser(userId, {
-        title: "חשבונית חדשה",
-        body: amountStr ? `${vendor} · ${amountStr}` : vendor,
-        url: `/invoices/pending?focus=${inv.id}`,
-        tag: `invoice-${inv.id}`,
-        invoiceId: inv.id,
-      });
-    } else {
-      await sendPushToUser(userId, {
-        title: "חשבוניות חדשות",
-        body: `${invoices.length} חשבוניות חדשות ממתינות לאישור`,
-        url: "/invoices/pending",
-        tag: "invoices-batch",
-      });
-    }
+    await sendPushToUser(userId, payload);
   } catch (e) {
     console.error("Failed to push new invoices:", e);
   }
