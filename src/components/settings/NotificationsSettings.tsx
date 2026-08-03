@@ -52,7 +52,23 @@ export function NotificationsSettings() {
       try {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
-        setStatus(sub ? "subscribed" : "unsubscribed");
+        if (sub) {
+          // The device already has a local subscription — but a prior save may
+          // have failed (e.g. a transient 401). Re-sync it to the server so
+          // "subscribed" always means the server can actually reach this device.
+          try {
+            const res = await fetch("/api/push/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(sub.toJSON()),
+            });
+            setStatus(res.ok ? "subscribed" : "unsubscribed");
+          } catch {
+            setStatus("unsubscribed");
+          }
+        } else {
+          setStatus("unsubscribed");
+        }
       } catch {
         setStatus("unsubscribed");
       }
