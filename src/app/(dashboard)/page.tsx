@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { categoryColors } from "@/lib/category-colors";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 
@@ -82,6 +82,16 @@ export default function DashboardPage() {
     { label: "ממתינות", value: data?.summary.pendingCount ?? 0, Icon: Clock, tint: "bg-amber-500/15 text-amber-600", badge: true },
     { label: "כרטיסים", value: data?.summary.creditCardCount ?? 0, Icon: CreditCard, tint: "bg-violet-500/15 text-violet-600" },
   ];
+
+  // Category donut: items sorted desc with % share + a ring-consistent total for the centre.
+  const catChart = useMemo(() => {
+    const cats = data?.byCategory ?? [];
+    const total = cats.reduce((s, c) => s + c.amount, 0);
+    const items = [...cats]
+      .sort((a, b) => b.amount - a.amount)
+      .map((c) => ({ ...c, pct: total > 0 ? Math.round((c.amount / total) * 100) : 0 }));
+    return { items, total };
+  }, [data]);
 
   return (
     <div className="space-y-4 max-w-5xl mx-auto">
@@ -165,23 +175,42 @@ export default function DashboardPage() {
           {/* charts */}
           <div className="grid gap-3 md:grid-cols-2" data-tour="charts">
             <div className="glass rounded-3xl p-4 sm:p-5">
-              <h3 className="text-[15px] font-bold mb-2">הוצאות לפי קטגוריה</h3>
-              {data && data.byCategory.length > 0 ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
-                    <Pie data={data.byCategory} dataKey="amount" nameKey="name" cx="50%" cy="44%" outerRadius="72%" innerRadius="46%" paddingAngle={2}>
-                      {data.byCategory.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Pie>
-                    <Tooltip formatter={(v) => [`₪${Number(v).toLocaleString("he-IL")}`, "סכום"]} contentStyle={{ fontSize: 12, borderRadius: 12, padding: "8px 12px", boxShadow: "0 8px 24px rgba(60,40,120,.18)", border: "none", background: "rgba(255,255,255,.95)", backdropFilter: "blur(8px)" }} />
-                    <Legend verticalAlign="bottom" height={38} formatter={(v) => <span className="text-[11px]">{v}</span>} />
-                  </PieChart>
-                </ResponsiveContainer>
+              <h3 className="text-[15px] font-bold mb-3">הוצאות לפי קטגוריה</h3>
+              {catChart.items.length > 0 ? (
+                <div className="flex items-center gap-3">
+                  {/* legend: % + name + dot, most spent first */}
+                  <div className="flex-1 min-w-0 space-y-2.5">
+                    {catChart.items.slice(0, 5).map((c) => (
+                      <div key={c.name} className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                        <span className="text-[13px] font-black tnum w-10 shrink-0">{c.pct}%</span>
+                        <span className="text-[12.5px] text-muted-foreground truncate">{c.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* donut with total in the centre */}
+                  <div className="relative w-[136px] h-[136px] shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={catChart.items} dataKey="amount" nameKey="name" cx="50%" cy="50%" outerRadius="100%" innerRadius="70%" paddingAngle={2} stroke="none">
+                          {catChart.items.map((e, i) => <Cell key={i} fill={e.color} />)}
+                        </Pie>
+                        <Tooltip formatter={(v) => [nis(Number(v)), "סכום"]} contentStyle={{ fontSize: 12, borderRadius: 12, padding: "8px 12px", boxShadow: "0 8px 24px rgba(60,40,120,.18)", border: "none", background: "rgba(255,255,255,.95)", backdropFilter: "blur(8px)" }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-2 text-center">
+                      <span className="text-[9.5px] text-muted-foreground leading-none">סה&quot;כ</span>
+                      <span className="text-[15px] font-black tnum leading-tight mt-0.5">{nis(catChart.total)}</span>
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <div className="flex items-center justify-center h-[240px] text-muted-foreground text-sm">אין נתונים להצגה</div>
+                <div className="flex items-center justify-center h-[136px] text-muted-foreground text-sm">אין נתונים להצגה</div>
               )}
             </div>
 
-            <div className="glass rounded-3xl p-4 sm:p-5">
+            {/* Monthly bar — desktop only (too cramped on mobile) */}
+            <div className="hidden md:block glass rounded-3xl p-4 sm:p-5">
               <h3 className="text-[15px] font-bold mb-2">הוצאות חודשיות</h3>
               {data && data.monthlyData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={240}>

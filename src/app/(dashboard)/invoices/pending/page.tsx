@@ -4,6 +4,7 @@ import { categoryColors } from "@/lib/category-colors";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   CheckCircle2,
+  Check,
   Download,
   Calendar,
   Loader2,
@@ -17,10 +18,7 @@ import {
   Circle,
   Search,
   ArrowUpDown,
-  Clock,
-  Receipt,
   Mail,
-  TrendingDown,
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
@@ -333,37 +331,28 @@ export default function PendingInvoicesPage() {
         )}
       </div>
 
-      {/* 1. Statistics strip */}
+      {/* Stats — clean tiles (label on top, prominent value) */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
-            <Receipt className="h-3.5 w-3.5" />
-            <span className="text-[10px] sm:text-xs">סה&quot;כ ממתין</span>
-          </div>
-          <div className="text-sm sm:text-base font-bold space-y-0.5">
+        <div className="glass rounded-2xl p-3 text-center flex flex-col justify-center">
+          <div className="text-[10.5px] text-muted-foreground mb-1">סה&quot;כ ממתין</div>
+          <div className="font-black tnum leading-tight text-[15px] sm:text-lg space-y-0.5">
             {Object.entries(stats.byCurrency).map(([cur, total]) => (
-              <div key={cur}>{currencySymbol(cur)}{total.toLocaleString("he-IL", { maximumFractionDigits: 0 })}</div>
+              <div key={cur}>{currencySymbol(cur)}{total.toLocaleString("he-IL", { maximumFractionDigits: 2 })}</div>
             ))}
             {Object.keys(stats.byCurrency).length === 0 && <div>₪0</div>}
           </div>
         </div>
-        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
-            <Clock className="h-3.5 w-3.5" />
-            <span className="text-[10px] sm:text-xs">חשבוניות</span>
-          </div>
-          <p className="text-sm sm:text-lg font-bold">{stats.count}</p>
+        <div className="glass rounded-2xl p-3 text-center flex flex-col justify-center">
+          <div className="text-[10.5px] text-muted-foreground mb-1">חשבוניות</div>
+          <div className="text-[22px] sm:text-2xl font-black tnum leading-none text-amber-500">{stats.count}</div>
         </div>
-        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
-            <TrendingDown className="h-3.5 w-3.5" />
-            <span className="text-[10px] sm:text-xs">ממוצע</span>
-          </div>
-          <p className="text-sm sm:text-lg font-bold">₪{stats.avg.toLocaleString("he-IL", { maximumFractionDigits: 0 })}</p>
+        <div className="glass rounded-2xl p-3 text-center flex flex-col justify-center">
+          <div className="text-[10.5px] text-muted-foreground mb-1">ממוצע</div>
+          <div className="text-[18px] sm:text-xl font-black tnum leading-none">₪{stats.avg.toLocaleString("he-IL", { maximumFractionDigits: 2 })}</div>
         </div>
       </div>
 
-      {/* 2. Toolbar — search + sort + advanced */}
+      {/* Toolbar — clean: search + one filter/sort button (sort & filters live in the sheet) */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -375,30 +364,13 @@ export default function PendingInvoicesPage() {
             className="w-full h-10 rounded-xl glass border-none pr-9 pl-3 text-[16px] sm:text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-violet-400/40"
           />
         </div>
-        <div className="flex items-center gap-1 h-10 rounded-xl glass px-2 shrink-0">
-          <ArrowUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="h-10 bg-transparent text-[12px] sm:text-sm text-foreground border-none cursor-pointer focus:outline-none"
-            title="מיין לפי"
-          >
-            <option value="created">חדש</option>
-            <option value="date">תאריך</option>
-            <option value="amount">סכום</option>
-            <option value="vendor">ספק</option>
-          </select>
-          <button onClick={() => setSortAsc((v) => !v)} className="text-muted-foreground hover:text-foreground text-base w-5 shrink-0" title={sortAsc ? "עולה" : "יורד"}>
-            {sortAsc ? "↑" : "↓"}
-          </button>
-        </div>
         <button
           onClick={() => setShowFilters(true)}
-          className={`relative h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${activeFilterCount > 0 ? "bg-primary text-primary-foreground" : "glass text-muted-foreground"}`}
-          title="סינון מתקדם"
-          aria-label="סינון מתקדם"
+          className={`relative h-10 px-3.5 rounded-xl flex items-center gap-1.5 shrink-0 text-[13px] font-medium transition-colors ${activeFilterCount > 0 ? "bg-primary text-primary-foreground" : "glass text-muted-foreground"}`}
+          title="מיון וסינון"
+          aria-label="מיון וסינון"
         >
-          <SlidersHorizontal className="h-4 w-4" />
+          <SlidersHorizontal className="h-4 w-4" /> סינון
           {activeFilterCount > 0 && <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">{activeFilterCount}</span>}
         </button>
       </div>
@@ -454,6 +426,16 @@ export default function PendingInvoicesPage() {
               <button onClick={() => setShowFilters(false)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-4">
+              {/* Sort */}
+              <div>
+                <label className="text-[12px] font-semibold mb-1.5 flex items-center gap-1.5"><ArrowUpDown className="h-3.5 w-3.5" /> מיון</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {([["created", "חדש"], ["date", "תאריך"], ["amount", "סכום"], ["vendor", "ספק"]] as [SortKey, string][]).map(([k, l]) => (
+                    <button key={k} onClick={() => setSortKey(k)} className={`h-9 px-3.5 rounded-xl text-[13px] font-medium transition-colors ${sortKey === k ? "bg-primary text-primary-foreground" : "glass text-muted-foreground"}`}>{l}</button>
+                  ))}
+                  <button onClick={() => setSortAsc((v) => !v)} className="h-9 px-3.5 rounded-xl glass text-[13px] font-medium text-muted-foreground flex items-center gap-1">{sortAsc ? "עולה ↑" : "יורד ↓"}</button>
+                </div>
+              </div>
               {/* Date range */}
               <div>
                 <label className="text-[12px] font-semibold mb-1.5 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> טווח תאריכים</label>
@@ -772,8 +754,8 @@ export default function PendingInvoicesPage() {
                       {waitTime && <span className="text-amber-500">{waitTime}</span>}
                     </div>
                   </button>
-                  <button onClick={() => { if (longPressFired.current) return; approveOne(inv.id); }} disabled={approving === inv.id} aria-label="אשר" className="shrink-0 w-9 h-9 rounded-xl text-white flex items-center justify-center" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
-                    {approving === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-[18px] w-[18px]" strokeWidth={2.6} />}
+                  <button onClick={() => { if (longPressFired.current) return; approveOne(inv.id); }} disabled={approving === inv.id} aria-label="אשר" className="shrink-0 w-10 h-10 rounded-2xl text-white flex items-center justify-center shadow-md shadow-emerald-500/25 active:scale-95 transition-transform" style={{ background: "linear-gradient(135deg,#34d399,#059669)" }}>
+                    {approving === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={3} />}
                   </button>
                 </div>
               )}
