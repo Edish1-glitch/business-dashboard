@@ -17,6 +17,10 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* must be inlined at BUILD time. Compose interpolates this
+        # from deploy/oracle/.env (same dir) so the PWA push client gets the key.
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
     restart: always
     env_file: .env
     environment:
