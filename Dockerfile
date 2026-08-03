@@ -22,6 +22,12 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# NEXT_PUBLIC_* vars are inlined into the client bundle at BUILD time, so they
+# must be present during `npm run build` — runtime env vars are too late. Render
+# supplies matching service env vars as build args when declared as ARG here.
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
 # Build Next.js
 RUN npm run build
 
