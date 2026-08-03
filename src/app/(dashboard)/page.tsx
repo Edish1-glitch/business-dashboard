@@ -105,20 +105,20 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* controls: scope segmented + date presets */}
-      <div className="flex flex-wrap items-center gap-2 justify-between" data-tour="date-filter">
+      {/* controls: scope segmented + date presets — centered */}
+      <div className="flex flex-col items-center gap-2.5" data-tour="date-filter">
         <div className="glass rounded-2xl p-1 flex text-[13px] font-semibold">
           {([{ key: "all", label: "הכל" }, { key: "business", label: "עסקי" }, { key: "private", label: "פרטי" }] as { key: Scope; label: string }[]).map((s) => (
             <button
               key={s.key}
               onClick={() => setScope(s.key)}
-              className={`px-4 py-1.5 rounded-xl transition-colors ${scope === s.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
+              className={`px-5 py-1.5 rounded-xl transition-colors ${scope === s.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
             >
               {s.label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap justify-center">
           {datePresets.map((p) => (
             <button
               key={p.label}

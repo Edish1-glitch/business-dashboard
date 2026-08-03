@@ -171,24 +171,54 @@
     box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
   }
 
-  /* Floating glass bottom nav */
-  .glass-nav {
-    background: rgba(255, 255, 255, 0.82);
-    -webkit-backdrop-filter: blur(22px) saturate(150%);
-    backdrop-filter: blur(22px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 0 12px 34px rgba(70, 60, 110, 0.16);
+  /* Sticky top bar — real liquid glass: content refracts through the blur,
+     lit by a hairline top highlight + a soft glassy bottom edge. */
+  .glass-header {
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(26px) saturate(180%);
+    backdrop-filter: blur(26px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 6px 24px rgba(70, 60, 110, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
-  .dark .glass-nav {
-    background: rgba(22, 22, 30, 0.72);
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  .dark .glass-header {
+    background: rgba(18, 18, 26, 0.5);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
 
-  /* The single vibrant colour pop */
+  /* Floating glass bottom nav — genuinely translucent so the page refracts through */
+  .glass-nav {
+    background: rgba(255, 255, 255, 0.62);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+    backdrop-filter: blur(28px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 12px 34px rgba(70, 60, 110, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+  .dark .glass-nav {
+    background: rgba(22, 22, 30, 0.55);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* The single vibrant colour pop (solid gradient) */
   .hero-grad {
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 52%, #d946ef 100%);
     box-shadow: 0 16px 40px rgba(124, 58, 237, 0.30);
+  }
+
+  /* Real "liquid glass" hero — translucent tinted glass; the ambient background
+     refracts through the blur. Specular highlight + light edge for the glass feel. */
+  .hero-glass {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.72) 0%, rgba(139, 92, 246, 0.70) 52%, rgba(217, 70, 239, 0.66) 100%);
+    -webkit-backdrop-filter: blur(30px) saturate(160%);
+    backdrop-filter: blur(30px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 18px 44px rgba(124, 58, 237, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+  .dark .hero-glass {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.55) 0%, rgba(139, 92, 246, 0.52) 52%, rgba(217, 70, 239, 0.5) 100%);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   }
   .hero-gloss::before {
     content: "";
