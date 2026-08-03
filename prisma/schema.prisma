@@ -20,6 +20,50 @@ model User {
   creditCards CreditCard[]
   emailAccounts EmailAccount[]
   invoiceSends InvoiceSend[]
+  pushSubscriptions PushSubscription[]
+  notifications Notification[]
+  sessions    Session[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  jti        String   @unique // stable id minted per login, carried in the JWT (token.sid)
+  userAgent  String?
+  ip         String?
+  lastSeenAt DateTime @default(now())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   @default("new-invoice") // "new-invoice", ...
+  title     String
+  body      String
+  invoiceId String?
+  read      Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Category {
@@ -49,6 +93,7 @@ model Expense {
   date         DateTime
   source       String      // "email", "pdf", "manual", "green-invoice"
   paymentMethod String?    // "credit-card", "paypal", "cash", "transfer"
+  isBusiness   Boolean     @default(true) // true = business/deductible, false = private
   categoryId   String?
   category     Category?   @relation(fields: [categoryId], references: [id])
   creditCardId String?
@@ -77,6 +122,7 @@ model Invoice {
   date            DateTime?
   source          String    // "email", "pdf-upload", "green-invoice"
   status          String    @default("pending") // "pending", "approved", "rejected"
+  isBusiness      Boolean   @default(true) // true = business/deductible, false = private
   creditCardLast4 String?
   categoryId      String?
   category        Category? @relation(fields: [categoryId], references: [id])

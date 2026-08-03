@@ -25,6 +25,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  Briefcase,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -42,6 +44,7 @@ interface Invoice {
   currency: string | null;
   date: string | null;
   status: string;
+  isBusiness: boolean;
   creditCardLast4: string | null;
   category: Category | null;
   emailAccount: { email: string } | null;
@@ -75,6 +78,7 @@ export default function PendingInvoicesPage() {
   const [emailFilter, setEmailFilter] = useState<string>("");
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const [focusHandled, setFocusHandled] = useState(false);
 
   // range filters (collapsible panel)
   const [showFilters, setShowFilters] = useState(false);
@@ -107,6 +111,25 @@ export default function PendingInvoicesPage() {
 
   // Mirror optimistic (approve/delete/edit) changes into the cache for the next visit.
   useEffect(() => { pendingCache = { invoices, categories }; }, [invoices, categories]);
+
+  // Deep-link from a push notification: /invoices/pending?focus=<id> opens that
+  // invoice's edit view (approve / edit / mark-private) and scrolls to it.
+  useEffect(() => {
+    if (focusHandled || loading || invoices.length === 0) return;
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    setFocusHandled(true);
+    if (!focus) return;
+    const inv = invoices.find((i) => i.id === focus);
+    if (inv) {
+      setSearchQuery("");
+      setCurrentPage(1);
+      startEdit(inv);
+      setTimeout(() => document.getElementById(`inv-${inv.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("focus");
+    window.history.replaceState({}, "", url.toString());
+  }, [invoices, loading, focusHandled]);
 
   const emailAccounts = useMemo(() => {
     const set = new Set<string>();
@@ -191,14 +214,26 @@ export default function PendingInvoicesPage() {
   };
   const startEdit = (inv: Invoice) => {
     setEditingId(inv.id);
-    setEditData({ vendor: inv.vendor, amount: inv.amount, currency: inv.currency, date: inv.date ? inv.date.split("T")[0] : "", creditCardLast4: inv.creditCardLast4, category: inv.category });
+    setEditData({ vendor: inv.vendor, amount: inv.amount, currency: inv.currency, date: inv.date ? inv.date.split("T")[0] : "", creditCardLast4: inv.creditCardLast4, category: inv.category, isBusiness: inv.isBusiness });
   };
   const saveEdit = async (id: string) => {
-    await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vendor: editData.vendor, amount: editData.amount, currency: editData.currency, date: editData.date || null, categoryId: editData.category?.id || null, creditCardLast4: editData.creditCardLast4 || null }) });
+    const isBusiness = editData.isBusiness ?? true;
+    await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vendor: editData.vendor, amount: editData.amount, currency: editData.currency, date: editData.date || null, categoryId: editData.category?.id || null, creditCardLast4: editData.creditCardLast4 || null, isBusiness }) });
     setEditingId(null);
-    setInvoices((prev) => prev.map((inv) => inv.id === id ? { ...inv, vendor: editData.vendor ?? inv.vendor, amount: editData.amount ?? inv.amount, currency: editData.currency ?? inv.currency, date: editData.date ?? inv.date, creditCardLast4: editData.creditCardLast4 ?? inv.creditCardLast4, category: editData.category ?? inv.category } : inv));
+    setInvoices((prev) => prev.map((inv) => inv.id === id ? { ...inv, vendor: editData.vendor ?? inv.vendor, amount: editData.amount ?? inv.amount, currency: editData.currency ?? inv.currency, date: editData.date ?? inv.date, creditCardLast4: editData.creditCardLast4 ?? inv.creditCardLast4, category: editData.category ?? inv.category, isBusiness } : inv));
   };
   const approveOne = async (id: string) => { setApproving(id); await fetch(`/api/invoices/${id}/approve`, { method: "POST" }); setApproving(null); setInvoices((prev) => prev.filter((i) => i.id !== id)); setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; }); };
+  // Save current edits (incl. עסקי/פרטי) then approve — the "אשר" action from the edit view / notification.
+  const approveFromEdit = async (id: string) => {
+    setApproving(id);
+    const isBusiness = editData.isBusiness ?? true;
+    await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vendor: editData.vendor, amount: editData.amount, currency: editData.currency, date: editData.date || null, categoryId: editData.category?.id || null, creditCardLast4: editData.creditCardLast4 || null, isBusiness }) });
+    await fetch(`/api/invoices/${id}/approve`, { method: "POST" });
+    setApproving(null);
+    setEditingId(null);
+    setInvoices((prev) => prev.filter((i) => i.id !== id));
+    setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; });
+  };
   const deleteOne = async (id: string) => { setDeleting(id); await fetch(`/api/invoices/${id}`, { method: "DELETE" }); setDeleting(null); setEditingId(null); setInvoices((prev) => prev.filter((i) => i.id !== id)); setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; }); };
   const bulkApprove = async () => { if (selected.size === 0) return; setBulkAction(true); await fetch("/api/invoices/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve", ids: [...selected] }) }); setBulkAction(false); setInvoices((prev) => prev.filter((i) => !selected.has(i.id))); setSelected(new Set()); };
   const bulkDelete = async () => { if (selected.size === 0) return; setBulkAction(true); await fetch("/api/invoices/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: [...selected] }) }); setBulkAction(false); setInvoices((prev) => prev.filter((i) => !selected.has(i.id))); setSelected(new Set()); };
@@ -499,6 +534,7 @@ export default function PendingInvoicesPage() {
           return (
             <div
               key={inv.id}
+              id={`inv-${inv.id}`}
               className={`rounded-xl bg-card border border-border/60 shadow-sm transition-all overflow-hidden ${isSelected ? "ring-2 ring-primary/30 bg-primary/5" : ""}`}
             >
               {isEditing ? (
@@ -557,9 +593,35 @@ export default function PendingInvoicesPage() {
                           </div>
                         )}
                       </div>
+                      {/* Business / Private classification */}
+                      <div className="sm:col-span-2">
+                        <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">סיווג</label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditData({ ...editData, isBusiness: true })}
+                            className={`h-9 rounded-lg border text-[13px] font-medium flex items-center justify-center gap-1.5 transition-colors ${(editData.isBusiness ?? true) ? "bg-emerald-600 text-white border-emerald-600" : "bg-background text-muted-foreground border-input hover:bg-muted"}`}
+                          >
+                            <Briefcase className="h-3.5 w-3.5" /> עסקי
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditData({ ...editData, isBusiness: false })}
+                            className={`h-9 rounded-lg border text-[13px] font-medium flex items-center justify-center gap-1.5 transition-colors ${!(editData.isBusiness ?? true) ? "bg-slate-600 text-white border-slate-600" : "bg-background text-muted-foreground border-input hover:bg-muted"}`}
+                          >
+                            <Lock className="h-3.5 w-3.5" /> פרטי
+                          </button>
+                        </div>
+                        {!(editData.isBusiness ?? true) && (
+                          <p className="text-[10px] text-muted-foreground mt-1">הוצאה פרטית — לא מתקזזת ולא נשלחת לרו&quot;ח</p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                      <Button size="sm" className="gap-1 h-8 text-xs" onClick={() => saveEdit(inv.id)}><CheckCircle2 className="h-3 w-3" /> שמור</Button>
+                      <Button size="sm" className="gap-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveFromEdit(inv.id)} disabled={approving === inv.id}>
+                        {approving === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />} אשר
+                      </Button>
+                      <Button variant="outline" size="sm" className="gap-1 h-8 text-xs" onClick={() => saveEdit(inv.id)}>שמור</Button>
                       <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setEditingId(null)}><X className="h-3 w-3 ml-0.5" /> ביטול</Button>
                       <div className="flex-1" />
                       <Button variant="ghost" size="sm" className="h-8 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 gap-1" onClick={() => deleteOne(inv.id)} disabled={deleting === inv.id}>
@@ -606,6 +668,11 @@ export default function PendingInvoicesPage() {
                         {inv.category && (
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
                             {inv.category.name}
+                          </span>
+                        )}
+                        {inv.isBusiness === false && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200 text-slate-700 flex items-center gap-0.5">
+                            <Lock className="h-2.5 w-2.5" /> פרטי
                           </span>
                         )}
                         {inv.creditCardLast4 && (

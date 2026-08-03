@@ -10,6 +10,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const from = searchParams.get("from");
     const to = searchParams.get("to");
+    // scope: "all" (default) | "business" | "private" — controls which expenses
+    // feed the total card + charts. Business/private breakdown is always returned.
+    const scope = searchParams.get("scope") || "all";
 
     const dateFilter: Record<string, unknown> = {};
     if (from) dateFilter.gte = new Date(from);
@@ -17,13 +20,27 @@ export async function GET(request: NextRequest) {
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
     // Total expenses this month (approved only)
-    const expenses = await prisma.expense.findMany({
+    const allExpenses = await prisma.expense.findMany({
       where: {
         userId: user.id,
         ...(hasDateFilter && { date: dateFilter }),
       },
       include: { category: true },
     });
+
+    // Business/private breakdown (always over the full set, ignoring scope)
+    const businessExpenses = allExpenses
+      .filter((e) => e.isBusiness)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const privateExpenses = allExpenses
+      .filter((e) => !e.isBusiness)
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // Apply scope to the set that drives the total card + charts
+    const expenses =
+      scope === "business" ? allExpenses.filter((e) => e.isBusiness)
+      : scope === "private" ? allExpenses.filter((e) => !e.isBusiness)
+      : allExpenses;
 
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
@@ -78,6 +95,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       summary: {
         totalExpenses: Math.round(totalExpenses * 100) / 100,
+        businessExpenses: Math.round(businessExpenses * 100) / 100,
+        privateExpenses: Math.round(privateExpenses * 100) / 100,
         approvedCount,
         pendingCount,
         creditCardCount,

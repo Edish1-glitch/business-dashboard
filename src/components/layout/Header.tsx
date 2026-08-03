@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { usePendingCount } from "@/components/providers/PendingCountProvider";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Sun, Moon } from "lucide-react";
 import {
   LayoutDashboard,
@@ -105,6 +106,7 @@ export function Header() {
                   {session.user.name?.split(" ")[0]}
                 </span>
               </div>
+              <NotificationBell />
               <div className="relative">
                 <button
                   onClick={() => setShowThemeMenu(!showThemeMenu)}

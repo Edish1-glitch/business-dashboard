@@ -6,6 +6,8 @@ import { Tag, User, Plus, Loader2, X, Play, Mail, RefreshCw, Trash2, Calendar, A
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useSyncContext } from "@/components/providers/SyncProvider";
+import { NotificationsSettings } from "@/components/settings/NotificationsSettings";
+import { DevicesSettings } from "@/components/settings/DevicesSettings";
 
 interface Category {
   id: string;
@@ -414,6 +416,9 @@ function SettingsPage() {
         )}
       </div>
 
+      {/* Notifications (Web Push) */}
+      <NotificationsSettings />
+
       {/* Accountant email */}
       <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-2">
@@ -487,6 +492,9 @@ function SettingsPage() {
           </>
         )}
       </div>
+
+      {/* Connected devices / sessions */}
+      <DevicesSettings />
 
       {/* Tour */}
       <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">

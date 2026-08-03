@@ -19,9 +19,13 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 
+type Scope = "all" | "business" | "private";
+
 interface DashboardData {
   summary: {
     totalExpenses: number;
+    businessExpenses: number;
+    privateExpenses: number;
     approvedCount: number;
     pendingCount: number;
     creditCardCount: number;
@@ -48,6 +52,7 @@ export default function DashboardPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showCustomDate, setShowCustomDate] = useState(false);
+  const [scope, setScope] = useState<Scope>("all");
 
   // Revalidate in the background; only the first-ever load shows a spinner.
   const fetchData = useCallback(async () => {
@@ -55,22 +60,25 @@ export default function DashboardPage() {
       const params = new URLSearchParams();
       if (dateFrom) params.set("from", dateFrom);
       if (dateTo) params.set("to", dateTo);
+      if (scope !== "all") params.set("scope", scope);
       const res = await fetch(`/api/dashboard?${params}`);
       const d = await res.json();
       if (!d.error) {
         setData(d);
-        if (!dateFrom && !dateTo) dashboardCache = d; // cache only the default view
+        if (!dateFrom && !dateTo && scope === "all") dashboardCache = d; // cache only the default view
       }
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, scope]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const scopeTitle = scope === "business" ? 'הוצאות עסקיות' : scope === "private" ? 'הוצאות פרטיות' : 'סה"כ הוצאות';
   const cards = [
     {
-      title: 'סה"כ הוצאות',
-      value: data ? `₪${data.summary.totalExpenses.toLocaleString("he-IL")}` : "...",
+      title: scopeTitle,
+      value: data ? `₪${data.summary.totalExpenses.toLocaleString("he-IL", { maximumFractionDigits: 2 })}` : "...",
+      subtitle: data ? `עסקי ₪${data.summary.businessExpenses.toLocaleString("he-IL", { maximumFractionDigits: 2 })} · פרטי ₪${data.summary.privateExpenses.toLocaleString("he-IL", { maximumFractionDigits: 2 })}` : "",
       icon: TrendingDown,
       gradient: "from-red-500 to-rose-600",
       bgLight: "bg-red-50",
@@ -79,6 +87,7 @@ export default function DashboardPage() {
     {
       title: "חשבוניות מאושרות",
       value: data ? data.summary.approvedCount.toString() : "...",
+      subtitle: "",
       icon: TrendingUp,
       gradient: "from-emerald-500 to-green-600",
       bgLight: "bg-emerald-50",
@@ -87,6 +96,7 @@ export default function DashboardPage() {
     {
       title: "ממתינות לאישור",
       value: data ? data.summary.pendingCount.toString() : "...",
+      subtitle: "",
       icon: ClipboardCheck,
       gradient: "from-amber-500 to-orange-600",
       bgLight: "bg-amber-50",
@@ -95,6 +105,7 @@ export default function DashboardPage() {
     {
       title: "כרטיסי אשראי",
       value: data ? data.summary.creditCardCount.toString() : "...",
+      subtitle: "",
       icon: CreditCard,
       gradient: "from-violet-500 to-purple-600",
       bgLight: "bg-violet-50",
@@ -171,6 +182,25 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* Scope filter: all / business / private */}
+      <div className="flex items-center gap-2">
+        {([
+          { key: "all", label: "הכל" },
+          { key: "business", label: "עסקי" },
+          { key: "private", label: "פרטי" },
+        ] as { key: Scope; label: string }[]).map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setScope(s.key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              scope === s.key ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       {/* Summary Cards */}
       {loading ? (
         <div className="flex justify-center py-8">
@@ -194,6 +224,9 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-3">
                   <p className="text-3xl font-bold tracking-tight">{card.value}</p>
+                  {card.subtitle && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">{card.subtitle}</p>
+                  )}
                 </div>
               </div>
             ))}

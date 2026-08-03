@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { randomUUID } from "crypto";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -27,7 +28,28 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async session({ session }) {
+    // Mint a stable session id (sid) at login and persist a Session row so this
+    // device can later be listed and revoked ("disconnect device"). Only sets
+    // token.sid if the row is created — so a sid always implies a real row, and
+    // getAuthUser can treat "sid present but row missing" as revoked.
+    async jwt({ token, user }) {
+      const email = user?.email || token.email;
+      if (user && email && !(token as { sid?: string }).sid) {
+        try {
+          const { prisma } = await import("@/lib/db");
+          const dbUser = await prisma.user.findUnique({ where: { email } });
+          if (dbUser) {
+            const sid = randomUUID();
+            await prisma.session.create({ data: { jti: sid, userId: dbUser.id } });
+            (token as { sid?: string }).sid = sid;
+          }
+        } catch (e) {
+          console.error("Failed to create session:", e);
+        }
+      }
+      return token;
+    },
+    async session({ session, token }) {
       if (session.user?.email) {
         try {
           const { prisma } = await import("@/lib/db");
@@ -47,6 +69,8 @@ export const authOptions: NextAuthOptions = {
           console.error("Failed to get user:", e);
         }
       }
+      // Expose the session id so getAuthUser can validate/revoke it.
+      (session as { sid?: string }).sid = (token as { sid?: string }).sid;
       return session;
     },
   },

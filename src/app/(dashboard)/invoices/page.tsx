@@ -58,6 +58,7 @@ interface Invoice {
   currency: string | null;
   date: string | null;
   source: string;
+  isBusiness: boolean;
   creditCardLast4: string | null;
   category: Category | null;
   sends: InvoiceSend[];
@@ -548,6 +549,7 @@ export default function InvoicesPage() {
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
                     {inv.date && <span className="flex items-center gap-0.5"><Calendar className="h-2.5 w-2.5" />{fmtDate(inv.date)}</span>}
                     {inv.category && <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
+                    {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200 text-slate-700">פרטי</span>}
                     {inv.creditCardLast4 && <span className="flex items-center gap-0.5"><CreditCard className="h-2.5 w-2.5" />****{inv.creditCardLast4}</span>}
                     {isSent && (
                       <button onClick={() => setExpandedSendId(isExpanded ? null : inv.id)} className="flex items-center gap-0.5 text-emerald-600 font-medium hover:underline">
