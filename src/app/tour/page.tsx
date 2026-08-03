@@ -225,14 +225,17 @@ export default function TourPage() {
   const isLast = step === tourSlides.length - 1;
 
   return (
-    <div className="min-h-screen relative flex flex-col overflow-hidden" style={{ background: "linear-gradient(180deg,#f6f6fb,#f1f1f7)" }}>
+    <div className="min-h-screen relative flex flex-col overflow-hidden">
       <div className="lg-canvas" aria-hidden>
         <div className="lg-blob" style={{ width: 300, height: 300, top: -90, insetInlineStart: -70, background: "#a78bfa", opacity: 0.16 }} />
         <div className="lg-blob" style={{ width: 260, height: 260, bottom: 60, insetInlineEnd: -90, background: "#f0abfc", opacity: 0.12 }} />
       </div>
 
-      {/* progress banner */}
-      <div className={`bg-gradient-to-l ${slide.color} text-white text-center py-2.5 text-sm font-semibold`}>
+      {/* progress banner — pad the notch so its colour fills the status-bar area */}
+      <div
+        className={`bg-gradient-to-l ${slide.color} text-white text-center py-2.5 text-sm font-semibold`}
+        style={{ paddingTop: "calc(0.625rem + env(safe-area-inset-top))" }}
+      >
         🎯 סיור מודרך ({step + 1}/{tourSlides.length})
       </div>
 
