@@ -1,0 +1,13 @@
+# Caddy auto-provisions and renews a Let's Encrypt HTTPS certificate for
+# $APP_DOMAIN and reverse-proxies everything to the app container on :3000.
+# APP_DOMAIN is injected from the environment (see docker-compose.yml / .env).
+
+{$APP_DOMAIN} {
+	encode gzip
+	reverse_proxy app:3000 {
+		# flush immediately so the newline-delimited progress streams
+		# (/api/upload-invoices, /api/email-sync) arrive live, not buffered
+		# until the end.
+		flush_interval -1
+	}
+}

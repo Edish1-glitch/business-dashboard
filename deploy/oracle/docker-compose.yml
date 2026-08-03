@@ -1,0 +1,51 @@
+# Oracle Cloud (Always Free ARM Ampere A1) deployment.
+# Runs the Next.js app behind Caddy, which terminates HTTPS automatically
+# (Let's Encrypt) for your domain. The app itself is NOT exposed to the host —
+# only Caddy's 80/443 are public.
+#
+# Usage on the VM:
+#   cd deploy/oracle
+#   cp .env.example .env   &&  nano .env      # fill in real values
+#   docker compose up -d --build
+#
+# The image is the SAME Dockerfile used everywhere; the only prod difference is
+# NODE_OPTIONS below — Oracle has 12GB RAM, so we lift the tiny 350MB heap cap
+# that Render's 512MB box forced. (A runtime env var overrides the Dockerfile ENV.)
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: always
+    env_file: .env
+    environment:
+      # 12GB box → generous heap. Plenty for the app, leaving ample native
+      # memory for Chromium (HTML→PDF) and tesseract/poppler (OCR).
+      NODE_OPTIONS: "--max-old-space-size=2048"
+      NODE_ENV: "production"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    expose:
+      - "3000"          # internal only; Caddy reaches it over the compose network
+    # Chromium in a container needs a little shared memory for its renderer.
+    shm_size: "512mb"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"         # HTTP (Caddy redirects to HTTPS + serves ACME challenge)
+      - "443:443"       # HTTPS
+    environment:
+      APP_DOMAIN: "${APP_DOMAIN}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # persists the TLS certificate across restarts
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:
