@@ -28,24 +28,13 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    // Mint a stable session id (sid) at login and persist a Session row so this
-    // device can later be listed and revoked ("disconnect device"). Only sets
-    // token.sid if the row is created — so a sid always implies a real row, and
-    // getAuthUser can treat "sid present but row missing" as revoked.
+    // Mint a stable session id (sid) on initial sign-in for device tracking.
+    // The Session row itself is created lazily by getAuthUser (which has the
+    // request's user-agent/IP) — keeping DB work out of this callback avoids a
+    // login-time write failure leaving a sid with no row.
     async jwt({ token, user }) {
-      const email = user?.email || token.email;
-      if (user && email && !(token as { sid?: string }).sid) {
-        try {
-          const { prisma } = await import("@/lib/db");
-          const dbUser = await prisma.user.findUnique({ where: { email } });
-          if (dbUser) {
-            const sid = randomUUID();
-            await prisma.session.create({ data: { jti: sid, userId: dbUser.id } });
-            (token as { sid?: string }).sid = sid;
-          }
-        } catch (e) {
-          console.error("Failed to create session:", e);
-        }
+      if (user && !(token as { sid?: string }).sid) {
+        (token as { sid?: string }).sid = randomUUID();
       }
       return token;
     },

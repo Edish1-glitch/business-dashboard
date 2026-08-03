@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { headers } from "next/headers";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { validateAndTouchSession } from "@/lib/session-tracking";
+import { touchSession } from "@/lib/session-tracking";
 import { NextResponse } from "next/server";
 
 /**
@@ -29,12 +29,17 @@ export async function getAuthUser() {
 
   const sid = (session as { sid?: string }).sid || null;
   if (sid) {
-    const h = await headers();
-    const userAgent = h.get("user-agent");
-    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
-    const ok = await validateAndTouchSession(sid, user.id, userAgent, ip);
-    if (!ok) {
-      return { user: null, error: NextResponse.json({ error: "החיבור נותק" }, { status: 401 }), sid: null };
+    try {
+      const h = await headers();
+      const userAgent = h.get("user-agent");
+      const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
+      // Only an explicitly-revoked device is blocked; a missing row self-heals.
+      const allowed = await touchSession(sid, user.id, userAgent, ip);
+      if (!allowed) {
+        return { user: null, error: NextResponse.json({ error: "החיבור נותק" }, { status: 401 }), sid: null };
+      }
+    } catch {
+      // Never lock out a valid Google session on a tracking error — fail open.
     }
   }
 

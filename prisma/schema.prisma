@@ -30,6 +30,7 @@ model Session {
   jti        String   @unique // stable id minted per login, carried in the JWT (token.sid)
   userAgent  String?
   ip         String?
+  revoked    Boolean  @default(false) // explicit "disconnect device" — only this blocks auth
   lastSeenAt DateTime @default(now())
   userId     String
   user       User     @relation(fields: [userId], references: [id])

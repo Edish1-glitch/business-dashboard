@@ -10,7 +10,7 @@ export async function GET() {
   if (error) return error;
 
   const sessions = await prisma.session.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, revoked: false },
     orderBy: { lastSeenAt: "desc" },
   });
 
