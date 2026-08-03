@@ -691,33 +691,33 @@ export default function PendingInvoicesPage() {
                       </div>
                     </div>
 
-                    {/* Quick approve */}
+                    {/* Quick approve — primary action, always labelled */}
                     <Button
                       size="sm"
-                      className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-[11px] px-2 shrink-0"
+                      className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-[13px] px-4 shrink-0"
                       onClick={() => approveOne(inv.id)}
                       disabled={approving === inv.id}
                     >
-                      {approving === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                      <span className="hidden sm:inline">אשר</span>
+                      {approving === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      אשר
                     </Button>
                   </div>
 
-                  {/* Action bar */}
-                  <div className="flex items-center gap-0.5 sm:gap-1 px-2.5 sm:px-3 pb-2 pt-0 pr-[52px] sm:pr-[64px]">
-                    <button onClick={() => setPreviewId(inv.id)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                      <Eye className="h-3 w-3" /> <span className="hidden sm:inline">תצוגה</span>
+                  {/* Action bar — mobile keeps only edit + delete (larger targets); preview = tap thumbnail */}
+                  <div className="flex items-center gap-1.5 px-2.5 sm:px-3 pb-2.5 pt-0 pr-[52px] sm:pr-[64px]">
+                    <button onClick={() => setPreviewId(inv.id)} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
+                      <Eye className="h-3 w-3" /> תצוגה
                     </button>
-                    <button onClick={() => startEdit(inv)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                      <Pencil className="h-3 w-3" /> <span className="hidden sm:inline">עריכה</span>
+                    <button onClick={() => startEdit(inv)} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
+                      <Pencil className="h-3.5 w-3.5" /> עריכה
                     </button>
-                    <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                      <Download className="h-3 w-3" /> <span className="hidden sm:inline">הורדה</span>
+                    <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
+                      <Download className="h-3 w-3" /> הורדה
                     </button>
                     <div className="flex-1" />
-                    <button onClick={() => deleteOne(inv.id)} disabled={deleting === inv.id} className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors">
-                      {deleting === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                      <span className="hidden sm:inline">מחק</span>
+                    <button onClick={() => deleteOne(inv.id)} disabled={deleting === inv.id} className="flex items-center gap-1.5 text-[13px] text-red-400 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                      {deleting === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      מחק
                     </button>
                   </div>
                 </div>

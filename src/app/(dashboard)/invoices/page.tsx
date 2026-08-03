@@ -559,16 +559,16 @@ export default function InvoicesPage() {
                   </div>
                 </div>
 
-                {/* Send / Resend */}
+                {/* Send / Resend — primary action, always labelled */}
                 <Button
                   size="sm"
                   variant={isSent ? "outline" : "default"}
-                  className={`gap-1 h-8 text-[11px] px-2 shrink-0 ${isSent ? "" : "bg-primary hover:bg-primary/90 text-white"}`}
+                  className={`gap-1.5 h-9 text-[13px] px-4 shrink-0 ${isSent ? "" : "bg-primary hover:bg-primary/90 text-white"}`}
                   onClick={() => setSendTargetIds([inv.id])}
                   title={isSent ? "שלח שוב" : "שלח במייל"}
                 >
-                  {isSent ? <CornerUpLeft className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{isSent ? "שלח שוב" : "שלח"}</span>
+                  {isSent ? <CornerUpLeft className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                  {isSent ? "שלח שוב" : "שלח"}
                 </Button>
               </div>
 
@@ -587,20 +587,20 @@ export default function InvoicesPage() {
                 </div>
               )}
 
-              {/* Action bar */}
-              <div className="flex items-center gap-0.5 sm:gap-1 px-2.5 sm:px-3 pb-2 pt-0 pr-[52px] sm:pr-[64px]">
-                <button onClick={() => setPreviewId(inv.id)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                  <Eye className="h-3 w-3" /> <span className="hidden sm:inline">תצוגה</span>
+              {/* Action bar — mobile keeps only unapprove + delete (larger targets); preview = tap thumbnail */}
+              <div className="flex items-center gap-1.5 px-2.5 sm:px-3 pb-2.5 pt-0 pr-[52px] sm:pr-[64px]">
+                <button onClick={() => setPreviewId(inv.id)} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
+                  <Eye className="h-3 w-3" /> תצוגה
                 </button>
-                <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                  <Download className="h-3 w-3" /> <span className="hidden sm:inline">הורדה</span>
+                <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
+                  <Download className="h-3 w-3" /> הורדה
                 </button>
-                <button onClick={() => setConfirmAction({ type: "unapprove", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                  <Undo2 className="h-3 w-3" /> <span className="hidden sm:inline">החזר לעריכה</span>
+                <button onClick={() => setConfirmAction({ type: "unapprove", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
+                  <Undo2 className="h-3.5 w-3.5" /> החזר לעריכה
                 </button>
                 <div className="flex-1" />
-                <button onClick={() => setConfirmAction({ type: "delete", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors">
-                  <Trash2 className="h-3 w-3" /> <span className="hidden sm:inline">מחק</span>
+                <button onClick={() => setConfirmAction({ type: "delete", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-red-400 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                  <Trash2 className="h-3.5 w-3.5" /> מחק
                 </button>
               </div>
             </div>
