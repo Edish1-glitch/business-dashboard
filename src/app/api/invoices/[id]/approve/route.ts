@@ -49,6 +49,7 @@ export async function POST(
         date: invoice.date || new Date(),
         source: "pdf",
         paymentMethod: invoice.creditCardLast4 ? "credit-card" : "cash",
+        isBusiness: invoice.isBusiness,
         categoryId: invoice.categoryId,
         creditCardId,
         invoiceId: invoice.id,

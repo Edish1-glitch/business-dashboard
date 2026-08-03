@@ -7,8 +7,18 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Allow auth routes, login page, and debug
-  if (pathname.startsWith("/api/auth") || pathname === "/login" || pathname === "/api/debug-env" || pathname === "/tour" || pathname === "/api/email-accounts/callback") {
+  // Allow auth routes, login page, debug, PWA assets, and the secret-protected cron endpoint
+  if (
+    pathname.startsWith("/api/auth") ||
+    pathname === "/login" ||
+    pathname === "/api/debug-env" ||
+    pathname === "/tour" ||
+    pathname === "/api/email-accounts/callback" ||
+    pathname.startsWith("/api/cron") ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js" ||
+    pathname.startsWith("/icons")
+  ) {
     return NextResponse.next();
   }
 

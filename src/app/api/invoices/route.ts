@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true, fileName: true, filePath: true, fileUrl: true,
         vendor: true, amount: true, currency: true, date: true,
-        source: true, status: true, creditCardLast4: true,
+        source: true, status: true, isBusiness: true, creditCardLast4: true,
         categoryId: true, emailAccountId: true, createdAt: true,
         category: true,
         emailAccount: { select: { email: true } },

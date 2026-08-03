@@ -13,6 +13,7 @@ export interface ProcessResult {
   fileName: string;
   vendor: string | null;
   amount: number | null;
+  currency: string | null;
   date: string | null;
   category: string | null;
   creditCardLast4: string | null;
@@ -41,6 +42,7 @@ export async function processAndSave(
   if (exactDup) {
     return {
       id: exactDup.id, fileName, vendor: exactDup.vendor, amount: exactDup.amount,
+      currency: exactDup.currency,
       date: exactDup.date?.toISOString() || null, category: null,
       creditCardLast4: exactDup.creditCardLast4,
       duplicate: true, message: "קובץ זהה כבר הועלה", similarWarning: null,
@@ -50,7 +52,7 @@ export async function processAndSave(
   // Safety: check file size
   if (buffer.length > R2_LIMITS.MAX_FILE_SIZE) {
     return {
-      id: null, fileName, vendor: null, amount: null, date: null, category: null,
+      id: null, fileName, vendor: null, amount: null, currency: null, date: null, category: null,
       creditCardLast4: null, duplicate: false,
       message: `קובץ גדול מדי (${(buffer.length / 1024 / 1024).toFixed(1)}MB). מקסימום ${R2_LIMITS.MAX_FILE_SIZE / 1024 / 1024}MB`,
       similarWarning: null,
@@ -65,7 +67,7 @@ export async function processAndSave(
 
   if (text && isNegativeInvoice(text)) {
     return {
-      id: null, fileName, vendor: null, amount: null, date: null, category: null,
+      id: null, fileName, vendor: null, amount: null, currency: null, date: null, category: null,
       creditCardLast4: null, duplicate: false,
       message: "תוכן שלילי (unsuccessful/failed/declined/טופס רפואי) - דולג",
       similarWarning: null,
@@ -74,7 +76,7 @@ export async function processAndSave(
 
   if (source === "email" && text && !hasInvoiceSignals(text)) {
     return {
-      id: null, fileName, vendor: null, amount: null, date: null, category: null,
+      id: null, fileName, vendor: null, amount: null, currency: null, date: null, category: null,
       creditCardLast4: null, duplicate: false,
       message: "לא נמצאו סימני חשבונית בתוכן - דולג",
       similarWarning: null,
@@ -139,6 +141,7 @@ export async function processAndSave(
     id: invoice.id, fileName,
     vendor: invoiceData.vendor,
     amount: invoiceData.amount,
+    currency: invoiceData.currency || "ILS",
     date: invoiceData.date?.toISOString() || null,
     category: invoiceData.category,
     creditCardLast4: invoiceData.creditCardLast4,

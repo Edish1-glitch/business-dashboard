@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { usePendingCount } from "@/components/providers/PendingCountProvider";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Sun, Moon } from "lucide-react";
 import {
   LayoutDashboard,
@@ -74,7 +75,7 @@ export function Header() {
         className="peer sr-only"
       />
 
-      <header className="sticky top-0 z-40 flex items-center h-16 px-4 md:px-6 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <header className="glass-header sticky top-0 z-40 flex items-center h-16 px-4 md:px-6">
         {/* <label> for native touch handling - Safari always responds to label taps */}
         <label
           htmlFor={checkboxId}
@@ -105,6 +106,7 @@ export function Header() {
                   {session.user.name?.split(" ")[0]}
                 </span>
               </div>
+              <NotificationBell />
               <div className="relative">
                 <button
                   onClick={() => setShowThemeMenu(!showThemeMenu)}

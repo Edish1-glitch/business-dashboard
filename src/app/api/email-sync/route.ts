@@ -1,36 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/api-auth";
-import { getGmailClient, searchEmails, getAttachments, getInlineInvoice, htmlToText } from "@/lib/gmail";
-import { processAndSave, splitPdfToPageBuffers } from "@/lib/invoice-processor";
-import { extractInvoiceData, isNegativeInvoice, hasInvoiceSignals } from "@/lib/pdf/categorize";
+import { runSync } from "@/lib/sync-account";
 import { R2_LIMITS } from "@/lib/r2";
 
-// R2 free tier: 10GB. Stop at 8GB to leave buffer.
+// R2 free tier: 10GB. Stop at this cap to leave buffer.
 const MAX_STORAGE_BYTES = R2_LIMITS.MAX_TOTAL_STORAGE;
-
-/**
- * Estimate total storage used from DB.
- * For R2 files: use actual file sizes tracked in invoices.
- * For DB files: use base64 data length.
- */
-async function getStorageUsed(): Promise<number> {
-  // Sum sizes in SQL. The old version did findMany({select:{fileData}}) over the
-  // WHOLE table — i.e. it loaded every base64 blob in the DB into memory just to
-  // add up lengths, a large spike at the start of every sync. This does the same
-  // arithmetic in the database: decoded bytes ≈ base64 length * 0.75 for stored
-  // files, ~200KB estimate for R2-only files.
-  const rows = await prisma.$queryRawUnsafe<[{ total: number | null }]>(
-    `SELECT COALESCE(SUM(
-        CASE
-          WHEN "fileData" IS NOT NULL THEN LENGTH("fileData") * 0.75
-          WHEN "filePath" LIKE 'r2://%' THEN 204800
-          ELSE 0
-        END
-      ), 0)::float8 AS total FROM "Invoice"`
-  );
-  return Number(rows[0]?.total ?? 0);
-}
 
 // GET: return sync ranges for user's accounts
 export async function GET() {
@@ -82,284 +57,69 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "אין חשבונות אימייל מחוברים" }, { status: 400 });
     }
 
-    return syncAccounts(user.id, accounts.map((a) => a.id), afterDate, toDate);
+    return streamSync(user.id, accounts.map((a) => a.id), afterDate, toDate);
   } catch (error) {
     console.error("Email sync error:", error);
     return NextResponse.json({ error: "שגיאה בסנכרון" }, { status: 500 });
   }
 }
 
-async function syncAccounts(userId: string, accountIds: string[], afterDate: Date, toDate: Date | null = null) {
+/**
+ * Manual sync: runs the shared runSync core and streams its progress as
+ * newline-delimited JSON. No push notifications here — the user is watching the
+ * progress live; background push is handled by the cron endpoint instead.
+ */
+function streamSync(userId: string, accountIds: string[], afterDate: Date, toDate: Date | null = null) {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      function send(data: Record<string, unknown>) {
-        controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
-      }
+      const send = (data: Record<string, unknown>) => controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
 
-      let totalInvoicesFound = 0;
-      let totalDuplicates = 0;
-      let totalStorageAdded = 0;
-      let storageUsed = await getStorageUsed();
-      let lastProcessedDate: Date | null = null;
-      let stoppedEarly = false;
-      const failedAccounts: { email: string; reason: string; needsReconnect: boolean }[] = [];
-
-      const accounts = await prisma.emailAccount.findMany({
-        where: { id: { in: accountIds }, userId },
-      });
-
-      send({
-        type: "progress",
-        message: `מתחיל סנכרון ${accounts.length} חשבונות אימייל...`,
-        total: 0, current: 0,
-      });
-
-      for (const account of accounts) {
-        if (stoppedEarly) break;
-
-        // Use lastSyncAt if available and later than afterDate
-        const syncFrom = account.lastSyncAt && account.lastSyncAt > afterDate
-          ? account.lastSyncAt
-          : afterDate;
-
-        send({
-          type: "progress",
-          message: `מחפש מיילים עם חשבוניות ב-${account.email}...`,
-          total: 0, current: 0,
+      try {
+        const result = await runSync(userId, accountIds, afterDate, toDate, {
+          onProgress: (p) => send({ type: "progress", message: p.message, current: p.current, total: p.total }),
         });
 
-        let gmail;
-        try {
-          gmail = await getGmailClient(account);
-        } catch (err) {
-          const raw = err instanceof Error ? err.message : "שגיאה";
-          // invalid_grant / auth errors mean the account's token is no longer valid.
-          const needsReconnect = /invalid_grant|invalid_token|unauthorized|לא מחובר/i.test(raw);
-          failedAccounts.push({
-            email: account.email,
-            reason: needsReconnect ? "החיבור פג — צריך לחבר מחדש" : raw,
-            needsReconnect,
-          });
-          send({
-            type: "progress",
-            message: `⚠️ ${account.email}: ${needsReconnect ? "החיבור פג, צריך לחבר מחדש" : raw}`,
-            total: 0, current: 0,
-          });
-          continue;
+        const usedBytes = result.storageUsed + result.totalStorageAdded;
+        const remainingGB = ((MAX_STORAGE_BYTES - usedBytes) / 1024 / 1024 / 1024).toFixed(2);
+        const usedGB = (usedBytes / 1024 / 1024 / 1024).toFixed(2);
+
+        let summaryMessage = `סנכרון הושלם: ${result.totalInvoicesFound} חשבוניות חדשות`;
+        if (result.totalDuplicates > 0) summaryMessage += `, ${result.totalDuplicates} כפילויות דולגו`;
+        summaryMessage += ` (${usedGB}GB מתוך 10GB, נותרו ${remainingGB}GB)`;
+
+        if (result.stoppedEarly && result.lastProcessedDate) {
+          summaryMessage += `\nהסנכרון הגיע עד ${result.lastProcessedDate.toLocaleDateString("he-IL")}. ניתן להמשיך מאוחר יותר.`;
         }
 
-        let messageIds: string[];
-        try {
-          messageIds = await searchEmails(gmail, syncFrom, toDate);
-        } catch (err) {
-          const raw = err instanceof Error ? err.message : "שגיאה";
-          const needsReconnect = /invalid_grant|invalid_token|unauthorized/i.test(raw);
-          failedAccounts.push({ email: account.email, reason: needsReconnect ? "החיבור פג — צריך לחבר מחדש" : raw, needsReconnect });
-          send({
-            type: "progress",
-            message: `⚠️ שגיאה בחיפוש מיילים ב-${account.email}: ${raw}`,
-            total: 0, current: 0,
-          });
-          continue;
+        if (result.failedAccounts.length > 0) {
+          summaryMessage += `\n\n⚠️ ${result.failedAccounts.length} חשבונות לא סונכרנו:`;
+          for (const f of result.failedAccounts) summaryMessage += `\n• ${f.email} — ${f.reason}`;
+          if (result.failedAccounts.some((f) => f.needsReconnect)) {
+            summaryMessage += `\nחבר מחדש את החשבון/ות מכפתור "חבר Gmail" ונסה שוב.`;
+          }
         }
 
         send({
-          type: "progress",
-          message: `נמצאו ${messageIds.length} מיילים עם קבצים מצורפים ב-${account.email}`,
-          total: messageIds.length, current: 0,
+          type: "done",
+          success: result.failedAccounts.length === 0,
+          totalInvoices: result.totalInvoicesFound,
+          duplicatesSkipped: result.totalDuplicates,
+          storageUsedGB: usedGB,
+          storageRemainingGB: remainingGB,
+          stoppedEarly: result.stoppedEarly,
+          failedAccounts: result.failedAccounts,
+          lastProcessedDate: result.lastProcessedDate?.toISOString() || null,
+          message: summaryMessage,
         });
-
-        let processedMessages = 0;
-
-        for (const msgId of messageIds) {
-          if (stoppedEarly) break;
-
-          // Check storage limit
-          if (storageUsed + totalStorageAdded >= MAX_STORAGE_BYTES) {
-            stoppedEarly = true;
-            send({
-              type: "progress",
-              message: `נפח האחסון מתקרב למגבלה (${((storageUsed + totalStorageAdded) / 1024 / 1024 / 1024).toFixed(2)}GB מתוך 10GB). עוצר סנכרון.`,
-              total: messageIds.length, current: processedMessages,
-            });
-            break;
-          }
-
-          processedMessages++;
-
-          // Strategy 1: Process file attachments
-          let attachments: Awaited<ReturnType<typeof getAttachments>> = [];
-          try {
-            attachments = await getAttachments(gmail, msgId);
-          } catch {
-            attachments = [];
-          }
-
-          let msgDate: Date | null = null;
-
-          if (attachments.length > 0) {
-            msgDate = attachments[0]?.messageDate;
-
-            for (const att of attachments) {
-              if (stoppedEarly) break;
-              if (storageUsed + totalStorageAdded + att.buffer.length >= MAX_STORAGE_BYTES) {
-                stoppedEarly = true;
-                break;
-              }
-
-              try {
-                const pages = await splitPdfToPageBuffers(att.buffer, att.fileName);
-                for (const page of pages) {
-                  if (storageUsed + totalStorageAdded + page.buffer.length >= MAX_STORAGE_BYTES) {
-                    stoppedEarly = true;
-                    break;
-                  }
-                  const result = await processAndSave(page.buffer, page.fileName, userId, page.isImage, "email", account.id);
-                  if (result.duplicate) totalDuplicates++;
-                  else if (result.id) { totalInvoicesFound++; totalStorageAdded += page.buffer.length; }
-                }
-              } catch { /* skip failed */ }
-            }
-          }
-
-          // Strategy 2: Extract inline invoice from email HTML body
-          if (attachments.length === 0) {
-            try {
-              const inline = await getInlineInvoice(gmail, msgId);
-              if (inline) {
-                msgDate = inline.date;
-                const text = inline.textBody || htmlToText(inline.htmlBody);
-
-                if (isNegativeInvoice(text) || isNegativeInvoice(inline.subject)) continue;
-                if (!hasInvoiceSignals(text) && !hasInvoiceSignals(inline.subject)) continue;
-
-                const invoiceData = extractInvoiceData(text);
-
-                // Only save if we found meaningful data (amount is required)
-                if (invoiceData.amount) {
-                  // Save HTML for preview, text for OCR data
-                  const htmlContent = inline.htmlBody || `<pre>${text}</pre>`;
-                  const buffer = Buffer.from(htmlContent, "utf-8");
-
-                  // Check for duplicate by content hash
-                  const { createHash } = await import("crypto");
-                  const hash = createHash("sha256").update(buffer).digest("hex");
-                  const existing = await prisma.invoice.findFirst({ where: { fileHash: hash, userId } });
-
-                  if (!existing) {
-                    let categoryId: string | null = null;
-                    if (invoiceData.category) {
-                      const cat = await prisma.category.findFirst({ where: { name: invoiceData.category } });
-                      categoryId = cat?.id || null;
-                    }
-
-                    await prisma.invoice.create({
-                      data: {
-                        fileName: `email-${inline.subject.slice(0, 50)}.html`,
-                        filePath: "inline-html",
-                        fileHash: hash,
-                        fileData: buffer.toString("base64"),
-                        vendor: invoiceData.vendor,
-                        amount: invoiceData.amount,
-                        currency: invoiceData.currency || "ILS",
-                        date: invoiceData.date || inline.date,
-                        source: "email",
-                        status: "pending",
-                        creditCardLast4: invoiceData.creditCardLast4,
-                        categoryId,
-                        userId,
-                        emailAccountId: account.id,
-                      },
-                    });
-                    totalInvoicesFound++;
-                  } else {
-                    totalDuplicates++;
-                  }
-                }
-              }
-            } catch { /* skip failed inline extraction */ }
-          }
-
-          // Track date
-          if (msgDate && (!lastProcessedDate || msgDate > lastProcessedDate)) {
-            lastProcessedDate = msgDate;
-          }
-
-          // Progress update every message
-          const storageMB = ((storageUsed + totalStorageAdded) / 1024 / 1024).toFixed(0);
-          send({
-            type: "progress",
-            message: `מעבד מייל ${processedMessages} מתוך ${messageIds.length} ב-${account.email} (${totalInvoicesFound} חשבוניות, ${storageMB}MB)`,
-            total: messageIds.length,
-            current: processedMessages,
-          });
-
-          // Rate limit delay
-          await new Promise((r) => setTimeout(r, 100));
-        }
-
-        // Update lastSyncAt and save sync range
-        if (lastProcessedDate || !stoppedEarly) {
-          const syncEndDate = stoppedEarly && lastProcessedDate
-            ? lastProcessedDate
-            : (toDate || new Date());
-
-          await prisma.emailAccount.update({
-            where: { id: account.id },
-            data: { lastSyncAt: syncEndDate },
-          });
-
-          // Save sync range for history
-          await prisma.syncRange.create({
-            data: {
-              fromDate: syncFrom,
-              toDate: syncEndDate,
-              invoicesFound: totalInvoicesFound,
-              emailAccountId: account.id,
-            },
-          });
-        }
+      } catch (e) {
+        console.error("Sync stream error:", e);
+        // start() must ALWAYS emit a done event, even on failure.
+        send({ type: "done", success: false, totalInvoices: 0, duplicatesSkipped: 0, failedAccounts: [], message: "שגיאה בסנכרון" });
+      } finally {
+        controller.close();
       }
-
-      // Final summary
-      const remainingGB = ((MAX_STORAGE_BYTES - storageUsed - totalStorageAdded) / 1024 / 1024 / 1024).toFixed(2);
-      const usedGB = ((storageUsed + totalStorageAdded) / 1024 / 1024 / 1024).toFixed(2);
-
-      let summaryMessage = `סנכרון הושלם: ${totalInvoicesFound} חשבוניות חדשות`;
-      if (totalDuplicates > 0) summaryMessage += `, ${totalDuplicates} כפילויות דולגו`;
-      summaryMessage += ` (${usedGB}GB מתוך 10GB, נותרו ${remainingGB}GB)`;
-
-      if (stoppedEarly && lastProcessedDate) {
-        summaryMessage += `\nהסנכרון הגיע עד ${lastProcessedDate.toLocaleDateString("he-IL")}. ניתן להמשיך מאוחר יותר.`;
-      }
-
-      // Surface accounts that could not be synced so a failed sync is never
-      // mistaken for a successful empty one.
-      if (failedAccounts.length > 0) {
-        summaryMessage += `\n\n⚠️ ${failedAccounts.length} חשבונות לא סונכרנו:`;
-        for (const f of failedAccounts) {
-          summaryMessage += `\n• ${f.email} — ${f.reason}`;
-        }
-        const anyReconnect = failedAccounts.some((f) => f.needsReconnect);
-        if (anyReconnect) summaryMessage += `\nחבר מחדש את החשבון/ות מכפתור "חבר Gmail" ונסה שוב.`;
-      }
-
-      send({
-        type: "done",
-        success: failedAccounts.length === 0,
-        totalInvoices: totalInvoicesFound,
-        duplicatesSkipped: totalDuplicates,
-        storageUsedGB: usedGB,
-        storageRemainingGB: remainingGB,
-        stoppedEarly,
-        failedAccounts,
-        lastProcessedDate: lastProcessedDate?.toISOString() || null,
-        message: summaryMessage,
-      });
-
-      controller.close();
     },
   });
 
