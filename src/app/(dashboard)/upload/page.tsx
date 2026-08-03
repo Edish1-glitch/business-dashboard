@@ -133,7 +133,7 @@ export default function UploadPage() {
             {selectedFiles.map((file, i) => (
               <div
                 key={`${file.name}-${i}`}
-                className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/50"
+                className="flex items-center justify-between p-3 rounded-xl glass"
               >
                 <div className="flex items-center gap-3">
                   {file.type.startsWith("image/") ? (

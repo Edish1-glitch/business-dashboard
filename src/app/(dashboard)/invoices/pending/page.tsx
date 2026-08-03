@@ -298,7 +298,7 @@ export default function PendingInvoicesPage() {
 
       {/* 1. Statistics strip */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-card border border-border/60 p-2.5 sm:p-3 text-center">
+        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
             <Receipt className="h-3.5 w-3.5" />
             <span className="text-[10px] sm:text-xs">סה&quot;כ ממתין</span>
@@ -310,14 +310,14 @@ export default function PendingInvoicesPage() {
             {Object.keys(stats.byCurrency).length === 0 && <div>₪0</div>}
           </div>
         </div>
-        <div className="rounded-xl bg-card border border-border/60 p-2.5 sm:p-3 text-center">
+        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
             <Clock className="h-3.5 w-3.5" />
             <span className="text-[10px] sm:text-xs">חשבוניות</span>
           </div>
           <p className="text-sm sm:text-lg font-bold">{stats.count}</p>
         </div>
-        <div className="rounded-xl bg-card border border-border/60 p-2.5 sm:p-3 text-center">
+        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
             <TrendingDown className="h-3.5 w-3.5" />
             <span className="text-[10px] sm:text-xs">ממוצע</span>
@@ -368,7 +368,7 @@ export default function PendingInvoicesPage() {
 
       {/* Collapsible filter panel: account, category, date range, amount range + currency */}
       {showFilters && (
-        <div className="rounded-xl bg-card border border-border/60 p-3 space-y-3">
+        <div className="rounded-xl glass p-3 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Date range */}
             <div>
@@ -535,7 +535,7 @@ export default function PendingInvoicesPage() {
             <div
               key={inv.id}
               id={`inv-${inv.id}`}
-              className={`rounded-xl bg-card border border-border/60 shadow-sm transition-all overflow-hidden ${isSelected ? "ring-2 ring-primary/30 bg-primary/5" : ""}`}
+              className={`rounded-xl glass shadow-sm transition-all overflow-hidden ${isSelected ? "ring-2 ring-primary/30 bg-primary/5" : ""}`}
             >
               {isEditing ? (
                 /* ===== EDIT MODE ===== */

@@ -319,7 +319,7 @@ export default function InvoicesPage() {
 
       {/* Stats strip */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-card border border-border/60 p-2.5 sm:p-3 text-center">
+        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
             <Receipt className="h-3.5 w-3.5" /><span className="text-[10px] sm:text-xs">סה&quot;כ</span>
           </div>
@@ -330,13 +330,13 @@ export default function InvoicesPage() {
             {Object.keys(stats.byCurrency).length === 0 && <div>₪0</div>}
           </div>
         </div>
-        <div className="rounded-xl bg-card border border-border/60 p-2.5 sm:p-3 text-center">
+        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
             <CheckCircle2 className="h-3.5 w-3.5" /><span className="text-[10px] sm:text-xs">חשבוניות</span>
           </div>
           <p className="text-sm sm:text-lg font-bold">{stats.count}</p>
         </div>
-        <div className="rounded-xl bg-card border border-border/60 p-2.5 sm:p-3 text-center">
+        <div className="rounded-xl glass p-2.5 sm:p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-0.5">
             <Send className="h-3.5 w-3.5" /><span className="text-[10px] sm:text-xs">ממתין לשליחה</span>
           </div>
@@ -408,7 +408,7 @@ export default function InvoicesPage() {
 
       {/* Collapsible filter panel: date range, amount range + currency, category */}
       {showFilters && (
-        <div className="rounded-xl bg-card border border-border/60 p-3 space-y-3">
+        <div className="rounded-xl glass p-3 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Date range */}
             <div>
@@ -521,7 +521,7 @@ export default function InvoicesPage() {
           const lastSend = inv.sends[0];
           const isExpanded = expandedSendId === inv.id;
           return (
-            <div key={inv.id} className={`rounded-xl bg-card border border-border/60 shadow-sm transition-all overflow-hidden ${isSelected ? "ring-2 ring-primary/30 bg-primary/5" : ""}`}>
+            <div key={inv.id} className={`rounded-xl glass shadow-sm transition-all overflow-hidden ${isSelected ? "ring-2 ring-primary/30 bg-primary/5" : ""}`}>
               <div className="p-2.5 sm:p-3 flex items-center gap-2 sm:gap-3">
                 {/* Checkbox */}
                 <button onClick={() => toggleSelect(inv.id)} className="shrink-0 text-muted-foreground hover:text-foreground">

@@ -138,3 +138,66 @@
     outline: none;
   }
 }
+
+/* ===== Liquid Glass design system (mobile-first) =====
+   Wrapped in @layer components — Tailwind v4 strips raw top-level rules but
+   keeps @layer content. Components layer sits below utilities, so utility
+   classes on the same element still win where they overlap. */
+@layer components {
+  .tnum { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+  /* Ambient near-white background + a whisper of colour (blobs live in LiquidBackground) */
+  .lg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, #f6f6fb 0%, #f1f1f7 100%);
+    overflow: hidden;
+  }
+  .dark .lg-canvas { background: linear-gradient(180deg, #0e0f15 0%, #0a0a10 100%); }
+  .lg-blob { position: absolute; border-radius: 9999px; filter: blur(72px); pointer-events: none; }
+
+  /* Frosted glass surface — reads clean-white, defined by soft shadow + hairline */
+  .glass {
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 22px rgba(70, 60, 110, 0.08);
+  }
+  .dark .glass {
+    background: rgba(30, 30, 42, 0.55);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Floating glass bottom nav */
+  .glass-nav {
+    background: rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    backdrop-filter: blur(22px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 12px 34px rgba(70, 60, 110, 0.16);
+  }
+  .dark .glass-nav {
+    background: rgba(22, 22, 30, 0.72);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  }
+
+  /* The single vibrant colour pop */
+  .hero-grad {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 52%, #d946ef 100%);
+    box-shadow: 0 16px 40px rgba(124, 58, 237, 0.30);
+  }
+  .hero-gloss::before {
+    content: "";
+    position: absolute;
+    top: -40%;
+    right: -10%;
+    width: 70%;
+    height: 120%;
+    background: radial-gradient(closest-side, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0));
+    pointer-events: none;
+  }
+}

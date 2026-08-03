@@ -234,7 +234,7 @@ function SettingsPage() {
       )}
 
       {/* Profile */}
-      <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+      <div className="rounded-2xl glass p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-4">
           <User className="h-5 w-5 text-primary" />
           <h3 className="text-base font-semibold">פרופיל</h3>
@@ -258,7 +258,7 @@ function SettingsPage() {
       </div>
 
       {/* Email Accounts */}
-      <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+      <div className="rounded-2xl glass p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <Mail className="h-5 w-5 text-primary" />
@@ -420,7 +420,7 @@ function SettingsPage() {
       <NotificationsSettings />
 
       {/* Accountant email */}
-      <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+      <div className="rounded-2xl glass p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-2">
           <Send className="h-5 w-5 text-primary" />
           <h3 className="text-base font-semibold">מייל רואה חשבון</h3>
@@ -446,7 +446,7 @@ function SettingsPage() {
       </div>
 
       {/* Categories */}
-      <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+      <div className="rounded-2xl glass p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-4">
           <Tag className="h-5 w-5 text-primary" />
           <h3 className="text-base font-semibold">קטגוריות</h3>
@@ -497,7 +497,7 @@ function SettingsPage() {
       <DevicesSettings />
 
       {/* Tour */}
-      <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+      <div className="rounded-2xl glass p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold">סיור באפליקציה</h3>
@@ -511,7 +511,7 @@ function SettingsPage() {
       </div>
 
       {/* App info */}
-      <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+      <div className="rounded-2xl glass p-6 shadow-sm">
         <p className="text-sm text-muted-foreground">FinDash v1.0 - ניהול חשבוניות והוצאות</p>
       </div>
     </div>
