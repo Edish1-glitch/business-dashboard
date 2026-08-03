@@ -544,17 +544,16 @@ export default function InvoicesPage() {
                   </div>
                 </button>
 
-                {/* Send / Resend — primary action */}
-                <Button
-                  size="sm"
-                  variant={isSent ? "outline" : "default"}
-                  className={`gap-1.5 h-9 text-[13px] px-3.5 shrink-0 ${isSent ? "" : "bg-primary hover:bg-primary/90 text-white"}`}
+                {/* Send / Resend — teal paper-plane (mockup style) */}
+                <button
                   onClick={() => setSendTargetIds([inv.id])}
-                  title={isSent ? "שלח שוב" : "שלח במייל"}
+                  title={isSent ? "שלח שוב לרו״ח" : "שלח לרו״ח"}
+                  aria-label={isSent ? "שלח שוב" : "שלח"}
+                  className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-transform active:scale-95 ${isSent ? "glass text-teal-600 dark:text-teal-400" : "text-white shadow-md shadow-teal-500/25"}`}
+                  style={isSent ? undefined : { background: "linear-gradient(135deg,#2dd4bf,#0d9488)" }}
                 >
-                  {isSent ? <CornerUpLeft className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-                  {isSent ? "שלח שוב" : "שלח"}
-                </Button>
+                  {isSent ? <CornerUpLeft className="h-[18px] w-[18px]" /> : <Send className="h-[18px] w-[18px]" strokeWidth={2.4} />}
+                </button>
               </div>
 
               {/* expanded — send history + secondary actions */}

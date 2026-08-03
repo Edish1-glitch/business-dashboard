@@ -79,6 +79,24 @@ export async function uploadToR2(
 }
 
 /**
+ * Upload to an explicit key (no auto-naming, no 5MB user-file check).
+ * Used for small derived artifacts like cached invoice previews.
+ */
+export async function uploadToR2Key(
+  key: string,
+  buffer: Buffer,
+  contentType: string = "application/octet-stream"
+): Promise<void> {
+  const client = getR2Client();
+  await client.send(new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  }));
+}
+
+/**
  * Download a file from R2.
  */
 export async function downloadFromR2(key: string): Promise<{ buffer: Buffer; contentType: string }> {

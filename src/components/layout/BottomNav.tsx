@@ -30,8 +30,8 @@ export function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed inset-x-4 bottom-4 z-40 h-[62px] rounded-[26px] glass-nav flex items-center justify-between px-6"
-      style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+      className="md:hidden fixed inset-x-4 z-40 h-[62px] rounded-[26px] glass-nav flex items-center justify-between px-6"
+      style={{ bottom: "max(0.5rem, calc(env(safe-area-inset-bottom) - 0.75rem))" }}
     >
       {side.map((it) => (
         <NavLink key={it.href} {...it} active={isActive(it.href, it.exact)} />
