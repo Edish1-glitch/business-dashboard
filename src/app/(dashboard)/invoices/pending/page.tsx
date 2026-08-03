@@ -610,31 +610,37 @@ export default function PendingInvoicesPage() {
               ) : isEditing ? (
                 /* ===== EDIT (spacious inline card) ===== */
                 <div className="flex flex-col md:flex-row-reverse">
-                  <div className="relative md:w-2/5 bg-white border-b md:border-b-0 md:border-r border-border/60 h-44 md:h-auto md:max-h-[560px] overflow-hidden md:overflow-auto flex items-start justify-center shrink-0">
-                    {inv.fileName.endsWith(".html") ? (
-                      <iframe src={`/api/invoices/${inv.id}/preview`} className="w-full h-44 md:h-[560px] pointer-events-none" sandbox="allow-same-origin" title="preview" />
-                    ) : (
-                      <img src={`/api/invoices/${inv.id}/preview`} alt="preview" className="w-full h-full md:h-auto object-cover object-top" draggable={false} />
-                    )}
-                    {/* Tap to open the full preview */}
-                    <button type="button" onClick={() => setPreviewId(inv.id)} className="absolute inset-0 flex items-end justify-center pb-1.5" aria-label="הצג מלא">
+                  <div className="group relative md:w-2/5 shrink-0 border-b md:border-b-0 md:border-r border-border/60">
+                    <div className="bg-white h-32 md:h-auto md:max-h-[560px] overflow-hidden md:overflow-auto flex items-start justify-center">
+                      {inv.fileName.endsWith(".html") ? (
+                        <iframe src={`/api/invoices/${inv.id}/preview`} className="w-full h-32 md:h-[560px] pointer-events-none" sandbox="allow-same-origin" title="preview" />
+                      ) : (
+                        <img src={`/api/invoices/${inv.id}/preview`} alt="preview" className="w-full h-full md:h-auto object-cover object-top" draggable={false} />
+                      )}
+                    </div>
+                    {/* Mobile: tap anywhere to enlarge (fixed-height, non-scrolling) */}
+                    <button type="button" onClick={() => setPreviewId(inv.id)} className="md:hidden absolute inset-0 flex items-end justify-center pb-1.5" aria-label="הצג מלא">
                       <span className="px-2.5 py-1 rounded-full bg-black/55 text-white text-[10px] font-medium backdrop-blur-sm">הקש להגדלה</span>
                     </button>
+                    {/* Desktop: corner button revealed on hover — doesn't cover/block the scrollable preview */}
+                    <button type="button" onClick={() => setPreviewId(inv.id)} className="hidden md:block absolute top-2 left-2 z-10 px-2.5 py-1 rounded-full bg-black/60 text-white text-[11px] font-medium backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity" aria-label="הצג מלא">
+                      הגדלה
+                    </button>
                   </div>
-                  <div className="md:w-3/5 p-4 sm:p-5 space-y-4">
-                    <div className="space-y-3.5">
+                  <div className="md:w-3/5 p-3.5 sm:p-5 space-y-3">
+                    <div className="space-y-2.5">
                       <div>
-                        <label className="text-[12px] font-semibold mb-1.5 block">ספק</label>
-                        <input type="text" value={editData.vendor || ""} onChange={(e) => setEditData({ ...editData, vendor: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3.5 text-[15px]" />
+                        <label className="text-[12px] font-semibold mb-1 block">ספק</label>
+                        <input type="text" value={editData.vendor || ""} onChange={(e) => setEditData({ ...editData, vendor: e.target.value })} className="w-full h-10 rounded-xl border border-input bg-background px-3.5 text-[15px]" />
                       </div>
                       <div>
-                        <label className="text-[12px] font-semibold mb-1.5 block">סכום</label>
+                        <label className="text-[12px] font-semibold mb-1 block">סכום</label>
                         <div className="flex gap-2">
-                          <input type="number" step="0.01" value={editData.amount ?? ""} onChange={(e) => setEditData({ ...editData, amount: e.target.value === "" ? null : parseFloat(e.target.value) })} className="flex-1 min-w-0 h-11 rounded-xl border border-input bg-background px-3.5 text-[17px] font-bold tnum" />
+                          <input type="number" step="0.01" value={editData.amount ?? ""} onChange={(e) => setEditData({ ...editData, amount: e.target.value === "" ? null : parseFloat(e.target.value) })} className="flex-1 min-w-0 h-10 rounded-xl border border-input bg-background px-3.5 text-[16px] font-bold tnum" />
                           <select
                             value={editData.currency || "ILS"}
                             onChange={(e) => setEditData({ ...editData, currency: e.target.value })}
-                            className="h-11 w-[64px] shrink-0 rounded-xl border border-input bg-background text-[16px] text-center font-bold"
+                            className="h-10 w-[60px] shrink-0 rounded-xl border border-input bg-background text-[16px] text-center font-bold"
                           >
                             <option value="ILS">₪</option>
                             <option value="USD">$</option>
@@ -644,58 +650,58 @@ export default function PendingInvoicesPage() {
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2.5">
-                        <div>
-                          <label className="text-[12px] font-semibold mb-1.5 block">תאריך</label>
-                          <input type="date" value={typeof editData.date === "string" ? editData.date : ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
+                        <div className="min-w-0">
+                          <label className="text-[12px] font-semibold mb-1 block">תאריך</label>
+                          <input type="date" value={typeof editData.date === "string" ? editData.date : ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className="w-full min-w-0 h-10 rounded-xl border border-input bg-background px-2.5 text-[13px] appearance-none" />
                         </div>
-                        <div>
-                          <label className="text-[12px] font-semibold mb-1.5 block">4 ספרות כרטיס</label>
-                          <input type="text" inputMode="numeric" maxLength={4} value={editData.creditCardLast4 || ""} onChange={(e) => setEditData({ ...editData, creditCardLast4: e.target.value.replace(/\D/g, "") })} className="w-full h-11 rounded-xl border border-input bg-background px-3.5 text-[15px]" placeholder="1234" />
+                        <div className="min-w-0">
+                          <label className="text-[12px] font-semibold mb-1 block">4 ספרות כרטיס</label>
+                          <input type="text" inputMode="numeric" maxLength={4} value={editData.creditCardLast4 || ""} onChange={(e) => setEditData({ ...editData, creditCardLast4: e.target.value.replace(/\D/g, "") })} className="w-full min-w-0 h-10 rounded-xl border border-input bg-background px-3 text-[15px]" placeholder="1234" />
                         </div>
                       </div>
                       <div>
-                        <label className="text-[12px] font-semibold mb-1.5 block">קטגוריה</label>
+                        <label className="text-[12px] font-semibold mb-1 block">קטגוריה</label>
                         <div className="flex gap-2">
-                          <select value={editData.category?.id || ""} onChange={(e) => { const cat = categories.find((c) => c.id === e.target.value); setEditData({ ...editData, category: cat || null }); }} className="flex-1 h-11 rounded-xl border border-input bg-background px-3 text-[15px]">
+                          <select value={editData.category?.id || ""} onChange={(e) => { const cat = categories.find((c) => c.id === e.target.value); setEditData({ ...editData, category: cat || null }); }} className="flex-1 h-10 rounded-xl border border-input bg-background px-3 text-[15px]">
                             <option value="">ללא קטגוריה</option>
                             {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                           </select>
-                          <button type="button" onClick={() => setShowNewCategory(!showNewCategory)} className="h-11 w-11 shrink-0 rounded-xl glass flex items-center justify-center"><Plus className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => setShowNewCategory(!showNewCategory)} className="h-10 w-10 shrink-0 rounded-xl glass flex items-center justify-center"><Plus className="h-4 w-4" /></button>
                         </div>
                         {showNewCategory && (
                           <div className="flex gap-2 mt-2">
-                            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="שם קטגוריה חדשה" className="flex-1 h-11 rounded-xl border border-input bg-background px-3.5 text-[15px]" />
-                            <button onClick={addCategory} disabled={addingCategory} className="h-11 px-4 rounded-xl bg-primary text-primary-foreground text-[14px] font-medium shrink-0">{addingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : "הוסף"}</button>
+                            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="שם קטגוריה חדשה" className="flex-1 h-10 rounded-xl border border-input bg-background px-3.5 text-[15px]" />
+                            <button onClick={addCategory} disabled={addingCategory} className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-[14px] font-medium shrink-0">{addingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : "הוסף"}</button>
                           </div>
                         )}
                       </div>
                       {/* Business / Private classification */}
                       <div>
-                        <label className="text-[12px] font-semibold mb-1.5 block">סיווג</label>
+                        <label className="text-[12px] font-semibold mb-1 block">סיווג</label>
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={() => setEditData({ ...editData, isBusiness: true })}
-                            className={`h-11 rounded-xl border text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${(editData.isBusiness ?? true) ? "bg-emerald-600 text-white border-emerald-600" : "bg-background text-muted-foreground border-input"}`}
+                            className={`h-10 rounded-xl border text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${(editData.isBusiness ?? true) ? "bg-violet-600 text-white border-violet-600" : "bg-background text-muted-foreground border-input"}`}
                           >
                             <Briefcase className="h-4 w-4" /> עסקי
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditData({ ...editData, isBusiness: false })}
-                            className={`h-11 rounded-xl border text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${!(editData.isBusiness ?? true) ? "bg-slate-600 text-white border-slate-600" : "bg-background text-muted-foreground border-input"}`}
+                            className={`h-10 rounded-xl border text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors ${!(editData.isBusiness ?? true) ? "bg-slate-600 text-white border-slate-600" : "bg-background text-muted-foreground border-input"}`}
                           >
                             <Lock className="h-4 w-4" /> פרטי
                           </button>
                         </div>
                         {!(editData.isBusiness ?? true) && (
-                          <p className="text-[11px] text-muted-foreground mt-1.5">הוצאה פרטית — לא מתקזזת ולא נשלחת לרו&quot;ח</p>
+                          <p className="text-[11px] text-muted-foreground mt-1">הוצאה פרטית — לא מתקזזת ולא נשלחת לרו&quot;ח</p>
                         )}
                       </div>
                     </div>
                     {/* Actions */}
-                    <div className="space-y-2 pt-1">
-                      <button onClick={() => approveFromEdit(inv.id)} disabled={approving === inv.id} className="w-full h-12 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                    <div className="space-y-2">
+                      <button onClick={() => approveFromEdit(inv.id)} disabled={approving === inv.id} className="w-full h-11 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
                         {approving === inv.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />} אשר ושמור
                       </button>
                       <div className="flex items-center gap-2">
