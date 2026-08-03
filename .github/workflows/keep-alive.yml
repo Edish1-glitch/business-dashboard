@@ -1,10 +1,8 @@
-name: Keep Render awake
+name: Keep Oracle active
 
-# Render's free tier spins the instance down after ~15 min of inactivity, and
-# waking it takes ~50s (the "slow to load / can't navigate" symptom). This job
-# pings the app every ~5 min so it stays warm. GitHub cron is best-effort and
-# often runs several minutes late, so 5 min leaves plenty of margin under the
-# 15 min spin-down window. (Repo is public → Actions minutes are free.)
+# The Oracle Always-Free VM doesn't spin down, but Oracle may reclaim an instance
+# that's idle for ~7 days. This periodic external ping keeps network activity up
+# so the instance isn't flagged idle. (Repo is public → Actions minutes are free.)
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -16,5 +14,5 @@ jobs:
     steps:
       - name: Ping app
         run: |
-          code=$(curl -sS -m 40 -o /dev/null -w "%{http_code}" https://business-dashboard-362m.onrender.com/login || echo "000")
+          code=$(curl -sS -m 40 -o /dev/null -w "%{http_code}" https://84.13.66.121.sslip.io/login || echo "000")
           echo "HTTP $code from /login at $(date -u)"

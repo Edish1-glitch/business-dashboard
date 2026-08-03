@@ -5,7 +5,7 @@ name: Background Gmail sync
 # the user manually syncing. Authenticated with the CRON_SECRET repo secret.
 #
 # Setup: add a repository secret named CRON_SECRET whose value matches the
-# CRON_SECRET env var on Render (Settings → Secrets and variables → Actions).
+# CRON_SECRET env var of the deployed app (the Oracle VM's deploy/oracle/.env).
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -23,9 +23,8 @@ jobs:
             echo "CRON_SECRET secret is not set — skipping."
             exit 0
           fi
-          # Warm the instance first (free tier may be spun down), then run the sync.
-          curl -sS -m 60 -o /dev/null "https://business-dashboard-362m.onrender.com/login" || true
+          # Run the incremental sync on the Oracle VM (always-on, no warm-up needed).
           resp=$(curl -sS -m 300 -w "\nHTTP %{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "https://business-dashboard-362m.onrender.com/api/cron/sync" || echo "request failed")
+            "https://84.13.66.121.sslip.io/api/cron/sync" || echo "request failed")
           echo "$resp"
