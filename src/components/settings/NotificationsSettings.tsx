@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellOff, Loader2, Check, AlertTriangle, Share } from "lucide-react";
+import { Bell, BellOff, Loader2, Check, AlertTriangle, Share, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Status = "loading" | "unsupported" | "denied" | "subscribed" | "unsubscribed";
@@ -23,6 +23,8 @@ export function NotificationsSettings() {
   const [status, setStatus] = useState<Status>("loading");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -135,6 +137,25 @@ export function NotificationsSettings() {
     }
   };
 
+  const sendTest = async () => {
+    setTestMsg(null);
+    setTesting(true);
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      setTestMsg(
+        res.ok
+          ? { ok: true, text: "נשלחה התראת בדיקה — אמורה לצוץ עכשיו 🎉" }
+          : { ok: false, text: data.error || "שליחת הבדיקה נכשלה" }
+      );
+    } catch {
+      setTestMsg({ ok: false, text: "שליחת הבדיקה נכשלה" });
+    } finally {
+      setTesting(false);
+      setTimeout(() => setTestMsg(null), 6000);
+    }
+  };
+
   return (
     <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
       <div className="flex items-center gap-3 mb-2">
@@ -172,14 +193,25 @@ export function NotificationsSettings() {
       )}
 
       {status === "subscribed" && (
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <span className="text-sm text-emerald-600 flex items-center gap-1.5">
-            <Check className="h-4 w-4" /> התראות מופעלות במכשיר הזה
-          </span>
-          <Button variant="outline" size="sm" onClick={disable} disabled={busy} className="gap-2">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellOff className="h-4 w-4" />}
-            כבה התראות
-          </Button>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-sm text-emerald-600 flex items-center gap-1.5">
+              <Check className="h-4 w-4" /> התראות מופעלות במכשיר הזה
+            </span>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={sendTest} disabled={testing} className="gap-2">
+                {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                שלח התראת בדיקה
+              </Button>
+              <Button variant="outline" size="sm" onClick={disable} disabled={busy} className="gap-2">
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellOff className="h-4 w-4" />}
+                כבה
+              </Button>
+            </div>
+          </div>
+          {testMsg && (
+            <p className={`text-[12px] ${testMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{testMsg.text}</p>
+          )}
         </div>
       )}
 
