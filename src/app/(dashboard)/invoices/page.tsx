@@ -108,7 +108,7 @@ export default function InvoicesPage() {
 
   // per-item ui
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const [expandedSendId, setExpandedSendId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null); // expanded card (actions + send history)
   const [confirmAction, setConfirmAction] = useState<{ type: "unapprove" | "delete"; invoiceId: string; vendorName: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -516,54 +516,39 @@ export default function InvoicesPage() {
       {/* Cards */}
       <div className="grid gap-2">
         {paginated.map((inv) => {
-          const isSelected = selected.has(inv.id);
           const isSent = inv.sends.length > 0;
-          const lastSend = inv.sends[0];
-          const isExpanded = expandedSendId === inv.id;
+          const open = openId === inv.id;
           return (
-            <div key={inv.id} className={`rounded-xl glass shadow-sm transition-all overflow-hidden ${isSelected ? "ring-2 ring-primary/30 bg-primary/5" : ""}`}>
-              <div className="p-2.5 sm:p-3 flex items-center gap-2 sm:gap-3">
-                {/* Checkbox */}
-                <button onClick={() => toggleSelect(inv.id)} className="shrink-0 text-muted-foreground hover:text-foreground">
-                  {isSelected ? <CheckSquare className="h-[18px] w-[18px] text-primary" /> : <Square className="h-[18px] w-[18px]" />}
-                </button>
-
-                {/* Thumbnail */}
-                <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-border overflow-hidden bg-white hover:ring-2 hover:ring-primary/30 transition-all flex items-center justify-center">
+            <div key={inv.id} className={`glass rounded-2xl overflow-hidden transition-all ${open ? "ring-2 ring-violet-400/40" : ""}`}>
+              <div className="p-3 flex items-center gap-3">
+                {/* Thumbnail (tap = preview) */}
+                <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-11 h-11 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
                   {inv.fileName.endsWith(".html") ? <Mail className="h-5 w-5 text-muted-foreground/40" /> : <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />}
                 </button>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
+                {/* Content (tap = expand actions) */}
+                <button onClick={() => setOpenId(open ? null : inv.id)} className="flex-1 min-w-0 text-start">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-[13px] sm:text-sm truncate flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      {inv.vendor || inv.fileName}
-                    </span>
-                    {inv.amount !== null ? (
-                      <span className="font-bold text-sm sm:text-base shrink-0">{formatAmount(inv.amount, inv.currency)}</span>
+                    <span className="font-bold text-[14px] truncate">{inv.vendor || inv.fileName}</span>
+                    {inv.amount !== null ? <span className="font-black text-[15px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
+                    {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
+                    {inv.date && <span>{fmtDate(inv.date)}</span>}
+                    {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">פרטי</span>}
+                    {isSent ? (
+                      <span className="text-emerald-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="h-2.5 w-2.5" /> נשלח{inv.sends.length > 1 ? ` (${inv.sends.length})` : ""}</span>
                     ) : (
-                      <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>
+                      <span className="text-amber-500 font-medium">ממתין לשליחה</span>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
-                    {inv.date && <span className="flex items-center gap-0.5"><Calendar className="h-2.5 w-2.5" />{fmtDate(inv.date)}</span>}
-                    {inv.category && <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                    {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200 text-slate-700">פרטי</span>}
-                    {inv.creditCardLast4 && <span className="flex items-center gap-0.5"><CreditCard className="h-2.5 w-2.5" />****{inv.creditCardLast4}</span>}
-                    {isSent && (
-                      <button onClick={() => setExpandedSendId(isExpanded ? null : inv.id)} className="flex items-center gap-0.5 text-emerald-600 font-medium hover:underline">
-                        <CheckCircle2 className="h-2.5 w-2.5" /> נשלח {inv.sends.length > 1 ? `(${inv.sends.length})` : ""}
-                      </button>
-                    )}
-                  </div>
-                </div>
+                </button>
 
-                {/* Send / Resend — primary action, always labelled */}
+                {/* Send / Resend — primary action */}
                 <Button
                   size="sm"
                   variant={isSent ? "outline" : "default"}
-                  className={`gap-1.5 h-9 text-[13px] px-4 shrink-0 ${isSent ? "" : "bg-primary hover:bg-primary/90 text-white"}`}
+                  className={`gap-1.5 h-9 text-[13px] px-3.5 shrink-0 ${isSent ? "" : "bg-primary hover:bg-primary/90 text-white"}`}
                   onClick={() => setSendTargetIds([inv.id])}
                   title={isSent ? "שלח שוב" : "שלח במייל"}
                 >
@@ -572,37 +557,35 @@ export default function InvoicesPage() {
                 </Button>
               </div>
 
-              {/* Send history (expandable) */}
-              {isExpanded && isSent && (
-                <div className="px-3 pb-2.5 pt-0 pr-[52px] sm:pr-[64px] space-y-1">
-                  {inv.sends.map((s, i) => (
-                    <div key={s.id || i} className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-2.5 py-1.5">
-                      <Send className="h-3 w-3 text-emerald-500 shrink-0" />
-                      <span className="font-medium text-foreground">{s.sentTo}</span>
-                      <span>·</span>
-                      <span>{fmtDate(s.createdAt)}</span>
-                      {s.fromEmail && <span className="hidden sm:inline text-muted-foreground/70">· מ-{s.fromEmail}</span>}
+              {/* expanded — send history + secondary actions */}
+              {open && (
+                <div className="px-3 pb-3 pt-0 space-y-2">
+                  {isSent && (
+                    <div className="space-y-1">
+                      {inv.sends.map((s, i) => (
+                        <div key={s.id || i} className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-2.5 py-1.5">
+                          <Send className="h-3 w-3 text-emerald-500 shrink-0" />
+                          <span className="font-medium text-foreground">{s.sentTo}</span>
+                          <span>·</span>
+                          <span>{fmtDate(s.createdAt)}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
+                      <Download className="h-3.5 w-3.5" /> הורדה
+                    </button>
+                    <button onClick={() => setConfirmAction({ type: "unapprove", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
+                      <Undo2 className="h-3.5 w-3.5" /> החזר לעריכה
+                    </button>
+                    <div className="flex-1" />
+                    <button onClick={() => setConfirmAction({ type: "delete", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-red-400 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                      <Trash2 className="h-3.5 w-3.5" /> מחק
+                    </button>
+                  </div>
                 </div>
               )}
-
-              {/* Action bar — mobile keeps only unapprove + delete (larger targets); preview = tap thumbnail */}
-              <div className="flex items-center gap-1.5 px-2.5 sm:px-3 pb-2.5 pt-0 pr-[52px] sm:pr-[64px]">
-                <button onClick={() => setPreviewId(inv.id)} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                  <Eye className="h-3 w-3" /> תצוגה
-                </button>
-                <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                  <Download className="h-3 w-3" /> הורדה
-                </button>
-                <button onClick={() => setConfirmAction({ type: "unapprove", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
-                  <Undo2 className="h-3.5 w-3.5" /> החזר לעריכה
-                </button>
-                <div className="flex-1" />
-                <button onClick={() => setConfirmAction({ type: "delete", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-red-400 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                  <Trash2 className="h-3.5 w-3.5" /> מחק
-                </button>
-              </div>
             </div>
           );
         })}

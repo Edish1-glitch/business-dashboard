@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   CheckCircle2,
   Download,
-  CreditCard,
   Calendar,
   Loader2,
   CheckCheck,
@@ -15,7 +14,6 @@ import {
   Trash2,
   Square,
   CheckSquare,
-  Eye,
   Search,
   ArrowUpDown,
   Clock,
@@ -79,6 +77,7 @@ export default function PendingInvoicesPage() {
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [focusHandled, setFocusHandled] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null); // expanded card showing אשר/ערוך/פרטי
 
   // range filters (collapsible panel)
   const [showFilters, setShowFilters] = useState(false);
@@ -123,7 +122,7 @@ export default function PendingInvoicesPage() {
     if (inv) {
       setSearchQuery("");
       setCurrentPage(1);
-      startEdit(inv);
+      setOpenId(inv.id);
       setTimeout(() => document.getElementById(`inv-${inv.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
     }
     const url = new URL(window.location.href);
@@ -223,6 +222,14 @@ export default function PendingInvoicesPage() {
     setInvoices((prev) => prev.map((inv) => inv.id === id ? { ...inv, vendor: editData.vendor ?? inv.vendor, amount: editData.amount ?? inv.amount, currency: editData.currency ?? inv.currency, date: editData.date ?? inv.date, creditCardLast4: editData.creditCardLast4 ?? inv.creditCardLast4, category: editData.category ?? inv.category, isBusiness } : inv));
   };
   const approveOne = async (id: string) => { setApproving(id); await fetch(`/api/invoices/${id}/approve`, { method: "POST" }); setApproving(null); setInvoices((prev) => prev.filter((i) => i.id !== id)); setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; }); };
+  // "פרטי" — mark the invoice private (not deductible / not sent to accountant) then approve it as a private expense.
+  const markPrivate = async (id: string) => {
+    setApproving(id);
+    await fetch(`/api/invoices/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isBusiness: false }) });
+    await fetch(`/api/invoices/${id}/approve`, { method: "POST" });
+    setApproving(null); setOpenId(null);
+    setInvoices((prev) => prev.filter((i) => i.id !== id));
+  };
   // Save current edits (incl. עסקי/פרטי) then approve — the "אשר" action from the edit view / notification.
   const approveFromEdit = async (id: string) => {
     setApproving(id);
@@ -262,16 +269,6 @@ export default function PendingInvoicesPage() {
   const formatAmount = (amount: number, currency?: string | null) => {
     const sym = { USD: "$", EUR: "€", GBP: "£", ILS: "₪" }[currency || "ILS"] || "₪";
     return `${sym}${amount.toLocaleString("he-IL")}`;
-  };
-
-  const getCatBorder = (name: string) => {
-    const colors: Record<string, string> = {
-      דלק: "border-l-orange-500", סופר: "border-l-green-500", מסעדות: "border-l-red-500",
-      תחבורה: "border-l-blue-500", ביטוח: "border-l-violet-500", תקשורת: "border-l-cyan-500",
-      "חשמל ומים": "border-l-yellow-500", שכירות: "border-l-pink-500", "ציוד משרדי": "border-l-slate-500",
-      "שיווק ופרסום": "border-l-rose-500", מיסים: "border-l-purple-500", תוכנה: "border-l-sky-500",
-    };
-    return colors[name] || "border-l-gray-400";
   };
 
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 text-primary animate-spin" /></div>;
@@ -527,15 +524,13 @@ export default function PendingInvoicesPage() {
       <div className="grid gap-2">
         {paginatedInvoices.map((inv) => {
           const isEditing = editingId === inv.id;
-          const isSelected = selected.has(inv.id);
-          const catBorder = inv.category ? getCatBorder(inv.category.name) : "border-l-amber-400";
           const waitTime = getWaitingTime(inv.createdAt);
 
           return (
             <div
               key={inv.id}
               id={`inv-${inv.id}`}
-              className={`rounded-xl glass shadow-sm transition-all overflow-hidden ${isSelected ? "ring-2 ring-primary/30 bg-primary/5" : ""}`}
+              className={`glass rounded-2xl overflow-hidden transition-all ${openId === inv.id ? "ring-2 ring-violet-400/40" : ""}`}
             >
               {isEditing ? (
                 /* ===== EDIT MODE ===== */
@@ -630,96 +625,55 @@ export default function PendingInvoicesPage() {
                     </div>
                   </div>
                 </div>
-              ) : (
-                /* ===== VIEW MODE ===== */
-                <div className={`border-l-[3px] ${catBorder}`}>
-                  <div className="p-2.5 sm:p-3 flex items-center gap-2 sm:gap-3">
-                    {/* Checkbox */}
-                    <button onClick={() => toggleSelect(inv.id)} className="shrink-0 text-muted-foreground hover:text-foreground">
-                      {isSelected ? <CheckSquare className="h-[18px] w-[18px] text-primary" /> : <Square className="h-[18px] w-[18px]" />}
+              ) : openId === inv.id ? (
+                /* ===== FOCUSED (mockup) — thumbnail + content + אשר/ערוך/פרטי ===== */
+                <div className="p-3">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-12 h-12 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
+                      {inv.fileName.endsWith(".html") ? <Mail className="h-5 w-5 text-muted-foreground/40" /> : <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />}
                     </button>
-
-                    {/* 4. Thumbnail or mail icon */}
-                    <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-border overflow-hidden bg-white hover:ring-2 hover:ring-primary/30 transition-all flex items-center justify-center">
-                      {inv.fileName.endsWith(".html") ? (
-                        <Mail className="h-5 w-5 text-muted-foreground/40" />
-                      ) : (
-                        <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />
-                      )}
-                    </button>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
+                    <button onClick={() => setOpenId(null)} className="flex-1 min-w-0 text-start">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-[13px] sm:text-sm truncate">{inv.vendor || inv.fileName}</span>
-                        {inv.amount !== null ? (
-                          <span className="font-bold text-sm sm:text-base shrink-0">{formatAmount(inv.amount, inv.currency)}</span>
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>
-                        )}
+                        <span className="font-bold text-[14px] truncate">{inv.vendor || inv.fileName}</span>
+                        {inv.amount !== null ? <span className="font-black text-[16px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
-                        {inv.date && (
-                          <span className="flex items-center gap-0.5">
-                            <Calendar className="h-2.5 w-2.5" />
-                            {new Date(inv.date).toLocaleDateString("he-IL")}
-                          </span>
-                        )}
-                        {inv.category && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>
-                            {inv.category.name}
-                          </span>
-                        )}
-                        {inv.isBusiness === false && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200 text-slate-700 flex items-center gap-0.5">
-                            <Lock className="h-2.5 w-2.5" /> פרטי
-                          </span>
-                        )}
-                        {inv.creditCardLast4 && (
-                          <span className="flex items-center gap-0.5">
-                            <CreditCard className="h-2.5 w-2.5" />
-                            ****{inv.creditCardLast4}
-                          </span>
-                        )}
-                        {/* 5. Waiting indicator */}
-                        {waitTime && (
-                          <span className="flex items-center gap-0.5 text-amber-500">
-                            <Clock className="h-2.5 w-2.5" />
-                            {waitTime}
-                          </span>
-                        )}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
+                        {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
+                        {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL")}</span>}
+                        {inv.creditCardLast4 && <span>· ****{inv.creditCardLast4}</span>}
+                        {waitTime && <span className="text-amber-500">{waitTime}</span>}
                       </div>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-3">
+                    <button onClick={() => approveOne(inv.id)} disabled={approving === inv.id} className="h-9 rounded-xl text-white text-[13px] font-semibold flex items-center justify-center gap-1.5" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                      {approving === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} אשר
+                    </button>
+                    <button onClick={() => startEdit(inv)} className="h-9 rounded-xl glass text-[13px] font-semibold flex items-center justify-center gap-1.5"><Pencil className="h-3.5 w-3.5" /> ערוך</button>
+                    <button onClick={() => markPrivate(inv.id)} disabled={approving === inv.id} className="h-9 rounded-xl bg-muted/70 text-muted-foreground text-[13px] font-semibold flex items-center justify-center gap-1.5"><Lock className="h-3.5 w-3.5" /> פרטי</button>
+                  </div>
+                </div>
+              ) : (
+                /* ===== COMPACT (mockup) — thumbnail + content + green approve circle ===== */
+                <div className="p-3 flex items-center gap-3">
+                  <button onClick={() => setPreviewId(inv.id)} className="shrink-0 w-11 h-11 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
+                    {inv.fileName.endsWith(".html") ? <Mail className="h-5 w-5 text-muted-foreground/40" /> : <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />}
+                  </button>
+                  <button onClick={() => setOpenId(inv.id)} className="flex-1 min-w-0 text-start">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-[14px] truncate">{inv.vendor || inv.fileName}</span>
+                      {inv.amount !== null ? <span className="font-black text-[15px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
                     </div>
-
-                    {/* Quick approve — primary action, always labelled */}
-                    <Button
-                      size="sm"
-                      className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-[13px] px-4 shrink-0"
-                      onClick={() => approveOne(inv.id)}
-                      disabled={approving === inv.id}
-                    >
-                      {approving === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                      אשר
-                    </Button>
-                  </div>
-
-                  {/* Action bar — mobile keeps only edit + delete (larger targets); preview = tap thumbnail */}
-                  <div className="flex items-center gap-1.5 px-2.5 sm:px-3 pb-2.5 pt-0 pr-[52px] sm:pr-[64px]">
-                    <button onClick={() => setPreviewId(inv.id)} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                      <Eye className="h-3 w-3" /> תצוגה
-                    </button>
-                    <button onClick={() => startEdit(inv)} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
-                      <Pencil className="h-3.5 w-3.5" /> עריכה
-                    </button>
-                    <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors">
-                      <Download className="h-3 w-3" /> הורדה
-                    </button>
-                    <div className="flex-1" />
-                    <button onClick={() => deleteOne(inv.id)} disabled={deleting === inv.id} className="flex items-center gap-1.5 text-[13px] text-red-400 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                      {deleting === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                      מחק
-                    </button>
-                  </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
+                      {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
+                      {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL")}</span>}
+                      {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
+                      {waitTime && <span className="text-amber-500">{waitTime}</span>}
+                    </div>
+                  </button>
+                  <button onClick={() => approveOne(inv.id)} disabled={approving === inv.id} aria-label="אשר" className="shrink-0 w-9 h-9 rounded-xl text-white flex items-center justify-center" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                    {approving === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-[18px] w-[18px]" strokeWidth={2.6} />}
+                  </button>
                 </div>
               )}
             </div>
