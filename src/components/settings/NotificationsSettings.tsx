@@ -71,20 +71,27 @@ export function NotificationsSettings() {
         return;
       }
       const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
-      });
+      // Reuse an existing subscription if the device already has one (a prior
+      // partial attempt), otherwise create a fresh one.
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+      }
       const res = await fetch("/api/push/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sub.toJSON()),
       });
-      if (!res.ok) throw new Error("save failed");
+      if (!res.ok) throw new Error(`שמירת המנוי נכשלה (${res.status})`);
       setStatus("subscribed");
     } catch (e) {
       console.error(e);
-      setError("לא הצלחנו להפעיל התראות. נסה שוב.");
+      // Surface the real error (name + message) so iOS-specific failures are visible.
+      const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      setError(`לא הצלחנו להפעיל התראות — ${msg}`);
     } finally {
       setBusy(false);
     }
