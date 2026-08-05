@@ -134,11 +134,13 @@ model Invoice {
   expenses        Expense[]
   sends           InvoiceSend[]
   createdAt       DateTime      @default(now())
+  deletedAt       DateTime?     // soft delete → "נמחקו לאחרונה"; purged for good after 14 days
 
   @@index([userId])
   @@index([source])
   @@index([status])
   @@index([emailAccountId])
+  @@index([deletedAt])
 }
 
 model InvoiceSend {

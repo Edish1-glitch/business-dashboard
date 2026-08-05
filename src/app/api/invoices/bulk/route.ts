@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/api-auth";
-import { deleteFromR2 } from "@/lib/r2";
 
 // Bulk actions: approve or delete multiple invoices
 export async function POST(request: NextRequest) {
@@ -68,13 +67,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "delete") {
-      for (const invoice of invoices) {
-        await prisma.expense.deleteMany({ where: { invoiceId: invoice.id } });
-        if (invoice.fileUrl && invoice.filePath.startsWith("r2://")) {
-          try { await deleteFromR2(invoice.fileUrl); } catch { /* ignore */ }
-        }
-        await prisma.invoice.delete({ where: { id: invoice.id } });
-      }
+      // Soft delete → "נמחקו לאחרונה" (restorable; auto-purged after 14 days).
+      await prisma.invoice.updateMany({
+        where: { id: { in: invoices.map((i) => i.id) } },
+        data: { deletedAt: new Date() },
+      });
       return NextResponse.json({ success: true, action: "delete", count: invoices.length });
     }
 

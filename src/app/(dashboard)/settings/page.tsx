@@ -496,6 +496,21 @@ function SettingsPage() {
       {/* Connected devices / sessions */}
       <DevicesSettings />
 
+      {/* Recently deleted (soft-delete trash) */}
+      <button
+        onClick={() => router.push("/invoices/deleted")}
+        className="w-full text-start rounded-2xl glass p-6 shadow-sm flex items-center gap-4 active:scale-[0.99] transition-transform"
+      >
+        <div className="w-11 h-11 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+          <Trash2 className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base font-semibold">נמחקו לאחרונה</h3>
+          <p className="text-sm text-muted-foreground">שחזור חשבוניות שנמחקו · נמחקות לצמיתות אחרי 14 יום</p>
+        </div>
+        <ChevronDown className="h-5 w-5 text-muted-foreground rotate-90 shrink-0" />
+      </button>
+
       {/* Tour */}
       <div className="rounded-2xl glass p-6 shadow-sm">
         <div className="flex items-center justify-between">

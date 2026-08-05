@@ -12,6 +12,7 @@ const pageTitles: Record<string, string> = {
   "/": "דאשבורד",
   "/upload": "העלאת חשבוניות",
   "/invoices/pending": "ממתינות לאישור",
+  "/invoices/deleted": "נמחקו לאחרונה",
   "/invoices": "חשבוניות",
   "/green-invoice": "חשבונית ירוקה",
   "/settings": "הגדרות",

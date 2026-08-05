@@ -572,7 +572,7 @@ export default function PendingInvoicesPage() {
           <div className="relative glass rounded-3xl p-5 w-full max-w-xs text-center" onClick={(e) => e.stopPropagation()}>
             <div className="w-12 h-12 rounded-2xl bg-red-500/15 text-red-500 flex items-center justify-center mx-auto mb-3"><Trash2 className="h-6 w-6" /></div>
             <h3 className="font-bold text-[15px] mb-1">{confirmDelete.type === "bulk" ? `למחוק ${selected.size} חשבוניות?` : "למחוק את החשבונית?"}</h3>
-            <p className="text-[12.5px] text-muted-foreground mb-4">בטוח שברצונך למחוק?</p>
+            <p className="text-[12.5px] text-muted-foreground mb-4">יעבור ל״נמחקו לאחרונה״ — אפשר לשחזר תוך 14 יום.</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(null)} className="flex-1 h-10 rounded-xl glass text-[14px] font-medium">ביטול</button>
               <button

@@ -2,6 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { runSync } from "@/lib/sync-account";
 import { recordNewInvoiceNotification, pushNewInvoices, type NewInvoiceInfo } from "@/lib/notify";
+import { deleteFromR2 } from "@/lib/r2";
+
+const PURGE_AFTER_MS = 14 * 24 * 60 * 60 * 1000; // "נמחקו לאחרונה" retention
+
+// Permanently remove invoices soft-deleted more than 14 days ago (file + expenses).
+async function purgeOldDeleted() {
+  try {
+    const cutoff = new Date(Date.now() - PURGE_AFTER_MS);
+    const stale = await prisma.invoice.findMany({
+      where: { deletedAt: { lt: cutoff } },
+      select: { id: true, fileUrl: true, filePath: true },
+    });
+    if (stale.length === 0) return 0;
+    for (const inv of stale) {
+      if (inv.fileUrl && inv.filePath.startsWith("r2://")) {
+        try { await deleteFromR2(inv.fileUrl); } catch { /* already gone */ }
+      }
+    }
+    const ids = stale.map((i) => i.id);
+    await prisma.expense.deleteMany({ where: { invoiceId: { in: ids } } });
+    await prisma.invoice.deleteMany({ where: { id: { in: ids } } });
+    return ids.length;
+  } catch (e) {
+    console.error("purge error:", e);
+    return 0;
+  }
+}
 
 // Background incremental sync for ALL users, triggered by an external scheduler
 // (GitHub Actions) with a shared secret. No user session. Detects invoices that
@@ -23,6 +50,9 @@ async function handle(request: NextRequest) {
   if (provided !== secret) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  // Purge the 14-day-old trash on every run (cheap when empty).
+  const purged = await purgeOldDeleted();
 
   // Group incremental-eligible accounts by user.
   const accounts = await prisma.emailAccount.findMany({
@@ -63,7 +93,7 @@ async function handle(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, usersProcessed, totalNew, errors: errors.length });
+  return NextResponse.json({ ok: true, usersProcessed, totalNew, purged, errors: errors.length });
 }
 
 export async function POST(request: NextRequest) {

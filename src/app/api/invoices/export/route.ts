@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const format = searchParams.get("format") || "csv";
 
     const invoices = await prisma.invoice.findMany({
-      where: { userId: user.id, status: "approved" },
+      where: { userId: user.id, status: "approved", deletedAt: null },
       // Only the columns the CSV needs — never load fileData for an export.
       select: {
         vendor: true, amount: true, date: true, creditCardLast4: true, source: true,

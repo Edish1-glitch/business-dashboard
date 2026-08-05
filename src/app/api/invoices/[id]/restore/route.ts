@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/api-auth";
 
-// Delete invoice and associated expenses
-export async function DELETE(
+// Restore a soft-deleted invoice from "נמחקו לאחרונה" (clears deletedAt).
+// Its Expense (if approved) re-counts automatically — the dashboard filters
+// expenses by invoice.deletedAt, so nothing else needs recreating.
+export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -16,8 +18,6 @@ export async function DELETE(
     return NextResponse.json({ error: "חשבונית לא נמצאה" }, { status: 404 });
   }
 
-  // Soft delete → moves to "נמחקו לאחרונה" (restorable; auto-purged after 14 days).
-  await prisma.invoice.update({ where: { id }, data: { deletedAt: new Date() } });
-
+  await prisma.invoice.update({ where: { id }, data: { deletedAt: null } });
   return NextResponse.json({ success: true });
 }

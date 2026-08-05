@@ -8,7 +8,7 @@ export async function POST() {
   if (error) return error;
 
   const pendingInvoices = await prisma.invoice.findMany({
-    where: { userId: user.id, status: "pending" },
+    where: { userId: user.id, status: "pending", deletedAt: null },
     // Only the fields needed to approve + create the expense — not fileData.
     select: {
       id: true, amount: true, vendor: true, fileName: true,

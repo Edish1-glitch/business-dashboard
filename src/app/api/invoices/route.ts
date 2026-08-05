@@ -13,9 +13,12 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
+    const deleted = searchParams.get("deleted") === "true";
 
     const where: Record<string, unknown> = {
       userId: user.id,
+      // Soft-deleted invoices are hidden everywhere except the trash view.
+      deletedAt: deleted ? { not: null } : null,
     };
 
     if (status) where.status = status;
@@ -50,12 +53,12 @@ export async function GET(request: NextRequest) {
         id: true, fileName: true, filePath: true, fileUrl: true,
         vendor: true, amount: true, currency: true, date: true,
         source: true, status: true, isBusiness: true, creditCardLast4: true,
-        categoryId: true, emailAccountId: true, createdAt: true,
+        categoryId: true, emailAccountId: true, createdAt: true, deletedAt: true,
         category: true,
         emailAccount: { select: { email: true } },
         sends: { orderBy: { createdAt: "desc" }, select: { id: true, sentTo: true, subject: true, fromEmail: true, createdAt: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: deleted ? { deletedAt: "desc" } : { createdAt: "desc" },
     });
 
     return NextResponse.json({ invoices });

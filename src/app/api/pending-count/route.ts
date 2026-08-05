@@ -8,7 +8,7 @@ export async function GET() {
     if (error) return error;
 
     const count = await prisma.invoice.count({
-      where: { userId: user.id, status: "pending" },
+      where: { userId: user.id, status: "pending", deletedAt: null },
     });
 
     return NextResponse.json({ count });

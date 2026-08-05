@@ -707,7 +707,7 @@ export default function InvoicesPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               {confirmAction.type === "delete"
-                ? "האם אתה בטוח שברצונך למחוק את החשבונית? פעולה זו אינה ניתנת לביטול."
+                ? "החשבונית תעבור ל״נמחקו לאחרונה״ — אפשר יהיה לשחזר אותה תוך 14 יום."
                 : "האם אתה בטוח שברצונך להחזיר את החשבונית לעריכה? היא תוסר מהחישובים ותעבור לדף ממתינות לאישור."}
             </p>
             <div className="flex gap-2 justify-end">

@@ -51,9 +51,10 @@ export async function PATCH(
   }
 }
 
-// DELETE invoice
+// DELETE invoice — soft delete by default (→ "נמחקו לאחרונה"); ?permanent=true
+// hard-deletes (expenses + R2 file). Auto-purge after 14 days handles the rest.
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -61,25 +62,24 @@ export async function DELETE(
     if (error) return error;
 
     const { id } = await params;
+    const permanent = new URL(request.url).searchParams.get("permanent") === "true";
 
     const invoice = await prisma.invoice.findUnique({ where: { id } });
     if (!invoice || invoice.userId !== user.id) {
       return NextResponse.json({ error: "חשבונית לא נמצאה" }, { status: 404 });
     }
 
-    // Delete associated expenses first
-    await prisma.expense.deleteMany({ where: { invoiceId: id } });
-
-    // Delete file from R2 if stored there
-    if (invoice.fileUrl && invoice.filePath.startsWith("r2://")) {
-      try {
-        await deleteFromR2(invoice.fileUrl);
-      } catch { /* file might already be deleted */ }
+    if (permanent) {
+      await prisma.expense.deleteMany({ where: { invoiceId: id } });
+      if (invoice.fileUrl && invoice.filePath.startsWith("r2://")) {
+        try { await deleteFromR2(invoice.fileUrl); } catch { /* already gone */ }
+      }
+      await prisma.invoice.delete({ where: { id } });
+      return NextResponse.json({ success: true, permanent: true });
     }
 
-    // Delete invoice
-    await prisma.invoice.delete({ where: { id } });
-
+    // Soft delete — keeps the row + file so it can be restored.
+    await prisma.invoice.update({ where: { id }, data: { deletedAt: new Date() } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Invoice delete error:", error);

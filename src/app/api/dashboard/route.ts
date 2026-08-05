@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
       where: {
         userId: user.id,
         ...(hasDateFilter && { date: dateFilter }),
+        // Exclude expenses whose invoice was (soft) deleted; keep manual expenses.
+        OR: [{ invoiceId: null }, { invoice: { deletedAt: null } }],
       },
       include: { category: true },
     });
@@ -46,10 +48,10 @@ export async function GET(request: NextRequest) {
 
     // Invoices count
     const approvedCount = await prisma.invoice.count({
-      where: { userId: user.id, status: "approved" },
+      where: { userId: user.id, status: "approved", deletedAt: null },
     });
     const pendingCount = await prisma.invoice.count({
-      where: { userId: user.id, status: "pending" },
+      where: { userId: user.id, status: "pending", deletedAt: null },
     });
 
     // Credit cards count
@@ -83,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     // Recent invoices (last 5 approved)
     const recentInvoices = await prisma.invoice.findMany({
-      where: { userId: user.id, status: "approved" },
+      where: { userId: user.id, status: "approved", deletedAt: null },
       select: {
         id: true, vendor: true, amount: true, currency: true, date: true,
         creditCardLast4: true, createdAt: true, category: true,
