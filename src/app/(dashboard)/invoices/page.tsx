@@ -420,7 +420,7 @@ export default function InvoicesPage() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
           <div
             className="relative w-full sm:max-w-md glass rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto overscroll-contain"
-            style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -507,20 +507,19 @@ export default function InvoicesPage() {
         const inv = invoices.find((i) => i.id === previewId);
         const isHtml = inv?.fileName.endsWith(".html");
         return (
-          <div
-            className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center px-3"
-            style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))", paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
-            onClick={() => setPreviewId(null)}
-          >
-            <div className="bg-white rounded-2xl overflow-hidden max-w-2xl max-h-full w-full flex flex-col" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between p-3 bg-white border-b shrink-0">
-                <span className="text-sm font-medium text-gray-700">תצוגה מקדימה</span>
-                <button onClick={() => setPreviewId(null)} className="p-1 rounded-lg hover:bg-gray-100"><X className="h-5 w-5 text-gray-500" /></button>
-              </div>
+          <div className="fixed inset-0 z-[100] bg-black flex flex-col" onClick={() => setPreviewId(null)}>
+            <div
+              className="shrink-0 flex items-center justify-between px-4 pb-2 text-white/90"
+              style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
+            >
+              <span className="text-sm font-medium">תצוגה מקדימה</span>
+              <button onClick={() => setPreviewId(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="flex-1 overflow-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
               {isHtml ? (
-                <iframe src={`/api/invoices/${previewId}/preview`} className="w-full flex-1 min-h-[60vh]" sandbox="allow-same-origin" title="preview" />
+                <iframe src={`/api/invoices/${previewId}/preview`} className="w-full h-full min-h-full bg-white" sandbox="allow-same-origin" title="preview" />
               ) : (
-                <div className="overflow-auto overscroll-contain flex-1"><img src={`/api/invoices/${previewId}/preview`} alt="preview" className="w-full" /></div>
+                <img src={`/api/invoices/${previewId}/preview`} alt="preview" className="w-full bg-white" />
               )}
             </div>
           </div>
@@ -571,21 +570,21 @@ export default function InvoicesPage() {
                 </button>
 
                 {/* Content (tap = expand actions) */}
-                <button onClick={() => { if (longPressFired.current) return; setOpenId(open ? null : inv.id); }} className="flex-1 min-w-0 text-start">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-[14px] truncate">{inv.vendor || inv.fileName}</span>
-                    {inv.amount !== null ? <span className="font-black text-[15px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
+                <button onClick={() => { if (longPressFired.current) return; setOpenId(open ? null : inv.id); }} className="flex-1 min-w-0 text-start flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-bold text-[14px] truncate block">{inv.vendor || inv.fileName}</span>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
+                      {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
+                      {inv.date && <span>{fmtDate(inv.date)}</span>}
+                      {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">פרטי</span>}
+                      {isSent ? (
+                        <span className="text-emerald-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="h-2.5 w-2.5" /> נשלח{inv.sends.length > 1 ? ` (${inv.sends.length})` : ""}</span>
+                      ) : (
+                        <span className="text-amber-500 font-medium">ממתין לשליחה</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
-                    {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                    {inv.date && <span>{fmtDate(inv.date)}</span>}
-                    {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">פרטי</span>}
-                    {isSent ? (
-                      <span className="text-emerald-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="h-2.5 w-2.5" /> נשלח{inv.sends.length > 1 ? ` (${inv.sends.length})` : ""}</span>
-                    ) : (
-                      <span className="text-amber-500 font-medium">ממתין לשליחה</span>
-                    )}
-                  </div>
+                  {inv.amount !== null ? <span className="font-black text-[15px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
                 </button>
 
                 {/* Send / Resend — violet paper-plane (brand colour) */}
