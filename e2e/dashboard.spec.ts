@@ -25,29 +25,23 @@ test.describe("Auth & Login", () => {
 test.describe("Tour Page", () => {
   test("tour page loads without auth", async ({ page }) => {
     await page.goto("/tour");
-    await expect(page.getByText("סיור באפליקציה")).toBeVisible();
+    await expect(page.getByText("סיור מודרך")).toBeVisible();
     await expect(page.getByText("ברוך הבא ל-FinDash")).toBeVisible();
   });
 
-  test("tour steps navigate through all 7 slides", async ({ page }) => {
+  test("tour steps navigate through all 8 slides", async ({ page }) => {
     await page.goto("/tour");
-    // Step 1 of 7
     await expect(page.getByText("ברוך הבא ל-FinDash")).toBeVisible();
-    await expect(page.getByText("1/7")).toBeVisible();
+    await expect(page.getByText("1/8")).toBeVisible();
 
-    // Step 2
     await page.getByRole("button", { name: "הבא" }).click();
     await expect(page.getByText("חבר את ה-Gmail")).toBeVisible();
-    await expect(page.getByText("2/7")).toBeVisible();
+    await expect(page.getByText("2/8")).toBeVisible();
 
-    // Step 3
-    await page.getByRole("button", { name: "הבא" }).click();
-    await expect(page.getByText("העלאת חשבוניות")).toBeVisible();
-
-    // Advance to the last slide and confirm the finish button
-    for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "הבא" }).click();
-    await expect(page.getByText("מסונכרן בכל מקום")).toBeVisible();
-    await expect(page.getByText("יאללה!")).toBeVisible();
+    // Advance to the last (8th) slide and confirm the finish button
+    for (let i = 0; i < 6; i++) await page.getByRole("button", { name: "הבא" }).click();
+    await expect(page.getByText("מאובטח ומחובר")).toBeVisible();
+    await expect(page.getByRole("button", { name: /יאללה/ })).toBeVisible();
   });
 });
 

@@ -10,8 +10,7 @@ npm run build                  # Production build (also runs ESLint; lint errors
 npm start                      # Production server (next start) — use this to test memory / double-fetch behavior
 npm run lint                   # ESLint
 npm test                       # Unit tests (vitest, tests/unit/**) — pure logic, no DB/network
-npx playwright test            # E2E tests (desktop/mobile/tablet)
-npx playwright test --grep "Mobile"
+npx playwright test            # E2E tests (Playwright, e2e/**) — needs NEXTAUTH_SECRET (read from .env)
 npx prisma generate            # Regenerate client after schema changes (client → src/generated/prisma, gitignored)
 npx prisma db push             # Push schema to the DB in .env (see DB note below)
 ```
@@ -22,6 +21,8 @@ Standalone `tsx` scripts don't auto-load `.env` — run them as:
 `set -a && . ./.env && set +a && npx tsx script.ts`
 
 **Tests** (`tests/unit/**`, vitest) are pure-logic only (no DB/network — vitest doesn't load `.env`). Convention: keep testable logic in `prisma`/`googleapis`-free modules — `pdf/categorize.ts`, `lib/user-agent.ts` (device labels), `lib/notify-format.ts` (push text/payload), `lib/rate-limit.ts`, `lib/crypto.ts`, `lib/gmail-scopes.ts`. Modules that import `prisma` (`notify.ts`, `session-tracking.ts`, `sync-account.ts`) must NOT be imported by a unit test — extract the pure part instead (that's why `notify-format.ts` / `user-agent.ts` exist).
+
+**E2E** (`e2e/**`, Playwright) runs against `npm run dev` and is fully DB/Gmail-independent: `e2e/helpers/auth.ts` mints a real NextAuth session cookie (`next-auth/jwt` `encode` with `NEXTAUTH_SECRET`) so the middleware treats the browser as logged in — no OAuth — and `e2e/helpers/mocks.ts` stubs every `/api/*` response via `page.route`, so tests are deterministic. `login()` also sets the `findash-onboarding-v4` localStorage flag (else the welcome modal's `z-[200]` overlay eats clicks). Covers the core flows: dashboard, pending (filter sheet, select, private 2-tap, delete-confirm), invoices (selection bar CSV/send/download), trash (restore/purge), tour, auth-redirect. Run: `npx playwright test` (helper reads `NEXTAUTH_SECRET` from `.env`).
 
 ## Architecture
 
