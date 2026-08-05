@@ -316,33 +316,21 @@ export default function InvoicesPage() {
 
   return (
     <div data-tour="invoices-list" className="space-y-3 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold">חשבוניות מאושרות</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            {invoices.length} מאושרות
-            {stats.unsent > 0 && (
-              <button
-                onClick={() => setSentFilter("unsent")}
-                className="mr-2 inline-flex items-center gap-1 text-amber-600 hover:underline"
-              >
-                <Clock className="h-3 w-3" />
-                {stats.unsent} ממתינות לשליחה
-              </button>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {!selectionMode && paginated.length > 0 && (
-            <button onClick={() => setSelectionMode(true)} className="h-8 px-3 rounded-lg glass text-[12px] font-medium text-primary flex items-center gap-1.5">
-              <CheckSquare className="h-4 w-4" /> בחר
+      {/* Header — centered title */}
+      <div className="text-center">
+        <h2 className="text-lg sm:text-xl font-bold">חשבוניות מאושרות</h2>
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          {invoices.length} מאושרות
+          {stats.unsent > 0 && (
+            <button
+              onClick={() => setSentFilter("unsent")}
+              className="mr-2 inline-flex items-center gap-1 text-amber-600 hover:underline"
+            >
+              <Clock className="h-3 w-3" />
+              {stats.unsent} ממתינות לשליחה
             </button>
           )}
-          <Button variant="outline" size="sm" onClick={() => window.open("/api/invoices/export?format=csv", "_blank")} className="gap-2 h-8 text-xs">
-            <FileDown className="h-4 w-4" /> CSV
-          </Button>
-        </div>
+        </p>
       </div>
 
       {/* Stats — clean tiles (label on top, prominent value) */}
@@ -389,8 +377,16 @@ export default function InvoicesPage() {
         </button>
       </div>
 
-      {/* Status quick chips + common categories */}
+      {/* Status quick chips + common categories (with "בחר" at the start) */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-2 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {!selectionMode && paginated.length > 0 && (
+          <>
+            <button onClick={() => setSelectionMode(true)} className="shrink-0 h-8 px-3.5 rounded-full text-[12px] font-medium glass text-primary flex items-center gap-1.5">
+              <CheckSquare className="h-3.5 w-3.5" /> בחר
+            </button>
+            <span className="shrink-0 w-px h-5 bg-border/60 mx-0.5" />
+          </>
+        )}
         {([["all", "הכל"], ["unsent", "לא נשלח"], ["sent", "נשלח"]] as [SentFilter, string][]).map(([key, label]) => (
           <button
             key={key}
@@ -512,6 +508,15 @@ export default function InvoicesPage() {
           </button>
           <span className="text-[12px] text-muted-foreground shrink-0 whitespace-nowrap">{selected.size} נבחרו</span>
           <div className="flex-1" />
+          <button
+            onClick={() => selected.size > 0 && window.open(`/api/invoices/export?format=csv&ids=${[...selected].join(",")}`, "_blank")}
+            disabled={selected.size === 0}
+            className="h-8 w-8 rounded-lg glass text-muted-foreground flex items-center justify-center disabled:opacity-40 shrink-0"
+            aria-label="ייצוא CSV"
+            title="ייצוא ל-CSV"
+          >
+            <FileDown className="h-3.5 w-3.5" />
+          </button>
           <button onClick={() => selected.size > 0 && setSendTargetIds([...selected])} disabled={selected.size === 0} className="h-8 px-3 rounded-lg text-white text-[12px] font-semibold flex items-center gap-1 disabled:opacity-40 shrink-0" style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
             <Send className="h-3.5 w-3.5" /> שלח
           </button>

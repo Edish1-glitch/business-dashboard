@@ -331,17 +331,10 @@ export default function PendingInvoicesPage() {
 
   return (
     <div data-tour="pending-list" className="space-y-3 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-end justify-between gap-2">
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold">ממתינות לאישור</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground">{invoices.length} חשבוניות ממתינות</p>
-        </div>
-        {!selectionMode && paginatedInvoices.length > 0 && (
-          <button onClick={() => setSelectionMode(true)} className="shrink-0 h-8 px-3 rounded-lg glass text-[12px] font-medium text-primary flex items-center gap-1.5">
-            <CheckSquare className="h-4 w-4" /> בחר
-          </button>
-        )}
+      {/* Header — centered title */}
+      <div className="text-center">
+        <h2 className="text-lg sm:text-xl font-bold">ממתינות לאישור</h2>
+        <p className="text-xs sm:text-sm text-muted-foreground">{invoices.length} חשבוניות ממתינות</p>
       </div>
 
       {/* Stats — clean tiles (label on top, prominent value) */}
@@ -388,8 +381,16 @@ export default function PendingInvoicesPage() {
         </button>
       </div>
 
-      {/* Quick filter chips — time presets + common categories */}
+      {/* Quick filter chips — "בחר" + time presets + common categories */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-2 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {!selectionMode && paginatedInvoices.length > 0 && (
+          <>
+            <button onClick={() => setSelectionMode(true)} className="shrink-0 h-8 px-3.5 rounded-full text-[12px] font-medium glass text-primary flex items-center gap-1.5">
+              <CheckSquare className="h-3.5 w-3.5" /> בחר
+            </button>
+            <span className="shrink-0 w-px h-5 bg-border/60 mx-0.5" />
+          </>
+        )}
         {(["all", "month", "lastMonth", "3months"] as const).map((key) => {
           const label = { all: "הכל", month: "החודש", lastMonth: "החודש שעבר", "3months": "3 חודשים" }[key];
           const active = key === "all" ? (!dateFrom && !dateTo) : timeChip === key;

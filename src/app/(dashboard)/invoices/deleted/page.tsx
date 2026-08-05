@@ -63,7 +63,7 @@ export default function DeletedInvoicesPage() {
 
   return (
     <div className="space-y-3 max-w-5xl mx-auto">
-      <div>
+      <div className="text-center">
         <h2 className="text-lg sm:text-xl font-bold">נמחקו לאחרונה</h2>
         <p className="text-xs sm:text-sm text-muted-foreground">{invoices.length} חשבוניות · נמחקות לצמיתות אוטומטית אחרי {RETENTION_DAYS} יום</p>
       </div>

@@ -191,7 +191,7 @@ function SettingsPage() {
 
   return (
     <div data-tour="settings" className="space-y-8 max-w-2xl mx-auto">
-      <h2 className="text-xl font-bold">הגדרות</h2>
+      <h2 className="text-xl font-bold text-center">הגדרות</h2>
 
       {/* Gmail status notification */}
       {gmailStatus === "connected" && (

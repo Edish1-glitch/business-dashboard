@@ -9,9 +9,14 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format") || "csv";
+    const idsParam = searchParams.get("ids"); // optional: export only these (selection)
+    const ids = idsParam ? idsParam.split(",").filter(Boolean) : null;
 
     const invoices = await prisma.invoice.findMany({
-      where: { userId: user.id, status: "approved", deletedAt: null },
+      where: {
+        userId: user.id, status: "approved", deletedAt: null,
+        ...(ids && ids.length ? { id: { in: ids } } : {}),
+      },
       // Only the columns the CSV needs — never load fileData for an export.
       select: {
         vendor: true, amount: true, date: true, creditCardLast4: true, source: true,
