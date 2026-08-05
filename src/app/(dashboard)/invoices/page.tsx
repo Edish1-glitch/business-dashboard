@@ -143,11 +143,25 @@ export default function InvoicesPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Lock background scroll while the filter sheet is open.
+  // Lock background scroll while the filter sheet is open. body{overflow:hidden}
+  // is not enough on iOS — pin the body with position:fixed and restore scroll.
   useEffect(() => {
     if (!showFilters) return;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    return () => {
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.right = "";
+      body.style.width = "";
+      window.scrollTo(0, scrollY);
+    };
   }, [showFilters]);
 
   // Mirror optimistic (send/unapprove/delete) changes into the cache for the next visit.
