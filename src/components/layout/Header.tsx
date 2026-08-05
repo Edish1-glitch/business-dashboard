@@ -1,26 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, Monitor, Sun, Moon } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { LogOut, Monitor, Sun, Moon, Receipt } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { cn } from "@/lib/utils";
 
-const pageTitles: Record<string, string> = {
-  "/": "דאשבורד",
-  "/upload": "העלאת חשבוניות",
-  "/invoices/pending": "ממתינות לאישור",
-  "/invoices/deleted": "נמחקו לאחרונה",
-  "/invoices": "חשבוניות",
-  "/green-invoice": "חשבונית ירוקה",
-  "/settings": "הגדרות",
-};
-
 export function Header() {
-  const pathname = usePathname();
-  const title = pageTitles[pathname] || "FinDash";
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [showThemeMenu, setShowThemeMenu] = useState(false);
@@ -30,13 +17,27 @@ export function Header() {
       className="glass-header sticky top-0 z-40 flex items-center px-4 md:px-6"
       style={{ height: "calc(4rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}
     >
-      <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+      {/* Start (right in RTL): notifications */}
+      <div className="flex-1 flex items-center justify-start">
+        {session?.user && <NotificationBell />}
+      </div>
 
-      {/* User info + actions — pushed to the left. Mobile navigation lives in the bottom nav. */}
-      <div className="mr-auto flex items-center gap-3">
+      {/* Center: brand (name + logo) */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0"
+          style={{ background: "linear-gradient(135deg,#6366f1,#a855f7)" }}
+        >
+          <Receipt className="h-4 w-4" strokeWidth={2.4} />
+        </div>
+        <span className="text-[17px] font-black tracking-tight">FinDash</span>
+      </div>
+
+      {/* End (left in RTL): user (desktop) + theme + logout */}
+      <div className="flex-1 flex items-center justify-end gap-2">
         {session?.user && (
           <>
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2 mr-1">
               {session.user.image && (
                 <img
                   src={session.user.image}
@@ -49,7 +50,6 @@ export function Header() {
                 {session.user.name?.split(" ")[0]}
               </span>
             </div>
-            <NotificationBell />
             <div className="relative">
               <button
                 onClick={() => setShowThemeMenu(!showThemeMenu)}
