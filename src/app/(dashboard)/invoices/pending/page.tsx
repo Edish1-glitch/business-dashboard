@@ -412,14 +412,14 @@ export default function PendingInvoicesPage() {
         </div>
       )}
 
-      {/* Advanced filter — bottom sheet (mobile) / centered card (desktop) */}
+      {/* Advanced filter — bottom sheet (anchored to bottom-0 like the nav so it
+          always reaches the screen edge; overflow-x hidden; dates stacked) */}
       {showFilters && (
-        <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center" onClick={() => setShowFilters(false)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+        <>
+          <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-[2px]" onClick={() => setShowFilters(false)} />
           <div
-            className="relative w-full sm:max-w-md glass rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto overscroll-contain"
+            className="fixed inset-x-0 bottom-0 z-[91] mx-auto w-full sm:max-w-md glass rounded-t-3xl p-4 max-h-[88vh] overflow-y-auto overflow-x-hidden overscroll-contain"
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold flex items-center gap-2"><SlidersHorizontal className="h-4 w-4" /> סינון מתקדם</h3>
@@ -436,21 +436,27 @@ export default function PendingInvoicesPage() {
                   <button onClick={() => setSortAsc((v) => !v)} className="h-9 px-3.5 rounded-xl glass text-[13px] font-medium text-muted-foreground flex items-center gap-1">{sortAsc ? "עולה ↑" : "יורד ↓"}</button>
                 </div>
               </div>
-              {/* Date range */}
+              {/* Date range — stacked (native date inputs overlap in a 2-col grid) */}
               <div>
                 <label className="text-[12px] font-semibold mb-1.5 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> טווח תאריכים</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setTimeChip("all"); }} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
-                  <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setTimeChip("all"); }} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground w-12 shrink-0">מתאריך</span>
+                    <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setTimeChip("all"); }} className="flex-1 min-w-0 h-10 rounded-xl border border-input bg-background px-3 text-[14px] appearance-none" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground w-12 shrink-0">עד</span>
+                    <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setTimeChip("all"); }} className="flex-1 min-w-0 h-10 rounded-xl border border-input bg-background px-3 text-[14px] appearance-none" />
+                  </div>
                 </div>
               </div>
               {/* Amount range + currency */}
               <div>
                 <label className="text-[12px] font-semibold mb-1.5 block">טווח סכומים</label>
                 <div className="flex gap-2">
-                  <input type="number" inputMode="decimal" placeholder="מסכום" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="flex-1 min-w-0 h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
-                  <input type="number" inputMode="decimal" placeholder="עד סכום" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="flex-1 min-w-0 h-11 rounded-xl border border-input bg-background px-3 text-[14px]" />
-                  <select value={amountCurrency} onChange={(e) => setAmountCurrency(e.target.value)} className="w-16 shrink-0 h-11 rounded-xl border border-input bg-background text-[14px] text-center">
+                  <input type="number" inputMode="decimal" placeholder="מסכום" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="flex-1 min-w-0 h-10 rounded-xl border border-input bg-background px-3 text-[14px]" />
+                  <input type="number" inputMode="decimal" placeholder="עד סכום" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="flex-1 min-w-0 h-10 rounded-xl border border-input bg-background px-3 text-[14px]" />
+                  <select value={amountCurrency} onChange={(e) => setAmountCurrency(e.target.value)} className="w-14 shrink-0 h-10 rounded-xl border border-input bg-background text-[14px] text-center">
                     <option value="">הכל</option>
                     <option value="ILS">₪</option>
                     <option value="USD">$</option>
@@ -463,7 +469,7 @@ export default function PendingInvoicesPage() {
               {categories.length > 0 && (
                 <div>
                   <label className="text-[12px] font-semibold mb-1.5 block">קטגוריה</label>
-                  <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]">
+                  <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full h-10 rounded-xl border border-input bg-background px-3 text-[14px]">
                     <option value="">כל הקטגוריות</option>
                     {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                   </select>
@@ -473,7 +479,7 @@ export default function PendingInvoicesPage() {
               {emailAccounts.length > 0 && (
                 <div>
                   <label className="text-[12px] font-semibold mb-1.5 flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> חשבון אימייל</label>
-                  <select value={emailFilter} onChange={(e) => setEmailFilter(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-[14px]">
+                  <select value={emailFilter} onChange={(e) => setEmailFilter(e.target.value)} className="w-full h-10 rounded-xl border border-input bg-background px-3 text-[14px]">
                     <option value="">כל החשבונות</option>
                     {emailAccounts.map((email) => <option key={email} value={email}>{email}</option>)}
                   </select>
@@ -485,7 +491,7 @@ export default function PendingInvoicesPage() {
               <button onClick={() => setShowFilters(false)} className="flex-[2] h-11 rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold">הצג {filteredInvoices.length} תוצאות</button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Selection bar — hidden until a long-press starts multi-select */}
