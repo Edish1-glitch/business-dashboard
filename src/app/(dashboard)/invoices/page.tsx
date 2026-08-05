@@ -143,25 +143,12 @@ export default function InvoicesPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Lock background scroll while the filter sheet is open. body{overflow:hidden}
-  // is not enough on iOS — pin the body with position:fixed and restore scroll.
+  // Lock background scroll while the filter sheet is open. (The real leak was
+  // dragging the backdrop — it has touch-none now; this is the belt-and-braces.)
   useEffect(() => {
     if (!showFilters) return;
-    const scrollY = window.scrollY;
-    const body = document.body;
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    return () => {
-      body.style.position = "";
-      body.style.top = "";
-      body.style.left = "";
-      body.style.right = "";
-      body.style.width = "";
-      window.scrollTo(0, scrollY);
-    };
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
   }, [showFilters]);
 
   // Mirror optimistic (send/unapprove/delete) changes into the cache for the next visit.
@@ -443,7 +430,7 @@ export default function InvoicesPage() {
           style={{ height: "var(--app-height, 100vh)", touchAction: "none" }}
           onClick={() => setShowFilters(false)}
         >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] touch-none" />
           <div
             className="relative mx-auto w-full sm:max-w-md glass rounded-t-3xl p-4 max-h-full overflow-y-auto overflow-x-hidden overscroll-contain"
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))", touchAction: "pan-y" }}

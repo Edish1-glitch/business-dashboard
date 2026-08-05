@@ -77,6 +77,8 @@ export default function PendingInvoicesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [focusHandled, setFocusHandled] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null); // expanded card showing אשר/ערוך/פרטי
+  const [confirmPrivateId, setConfirmPrivateId] = useState<string | null>(null); // "פרטי" needs a 2nd tap
+  const [confirmDelete, setConfirmDelete] = useState<{ type: "single" | "bulk"; id?: string } | null>(null);
 
   // advanced filters (bottom sheet)
   const [showFilters, setShowFilters] = useState(false);
@@ -119,26 +121,16 @@ export default function PendingInvoicesPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Lock background scroll while the filter sheet is open. body{overflow:hidden}
-  // is not enough on iOS — pin the body with position:fixed and restore scroll.
+  // Lock background scroll while the filter sheet is open. (The real leak was
+  // dragging the backdrop — it has touch-none now; this is the belt-and-braces.)
   useEffect(() => {
     if (!showFilters) return;
-    const scrollY = window.scrollY;
-    const body = document.body;
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    return () => {
-      body.style.position = "";
-      body.style.top = "";
-      body.style.left = "";
-      body.style.right = "";
-      body.style.width = "";
-      window.scrollTo(0, scrollY);
-    };
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
   }, [showFilters]);
+
+  // Reset the "פרטי" 2-tap confirm whenever the focused card changes.
+  useEffect(() => { setConfirmPrivateId(null); }, [openId]);
 
   // Mirror optimistic (approve/delete/edit) changes into the cache for the next visit.
   useEffect(() => { pendingCache = { invoices, categories }; }, [invoices, categories]);
@@ -441,7 +433,7 @@ export default function PendingInvoicesPage() {
           style={{ height: "var(--app-height, 100vh)", touchAction: "none" }}
           onClick={() => setShowFilters(false)}
         >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] touch-none" />
           <div
             className="relative mx-auto w-full sm:max-w-md glass rounded-t-3xl p-4 max-h-full overflow-y-auto overflow-x-hidden overscroll-contain"
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))", touchAction: "pan-y" }}
@@ -532,7 +524,7 @@ export default function PendingInvoicesPage() {
           <button onClick={bulkApprove} disabled={bulkAction || selected.size === 0} className="h-8 px-3 rounded-lg bg-emerald-600 text-white text-[12px] font-semibold flex items-center gap-1 disabled:opacity-40 shrink-0">
             {bulkAction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />} אשר
           </button>
-          <button onClick={bulkDelete} disabled={bulkAction || selected.size === 0} className="h-8 w-8 rounded-lg glass text-red-500 flex items-center justify-center disabled:opacity-40 shrink-0" aria-label="מחק">
+          <button onClick={() => selected.size > 0 && setConfirmDelete({ type: "bulk" })} disabled={bulkAction || selected.size === 0} className="h-8 w-8 rounded-lg glass text-red-500 flex items-center justify-center disabled:opacity-40 shrink-0" aria-label="מחק">
             {bulkAction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
           </button>
           <button
@@ -570,6 +562,31 @@ export default function PendingInvoicesPage() {
           >
             {bulkAction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           </button>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setConfirmDelete(null)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] touch-none" />
+          <div className="relative glass rounded-3xl p-5 w-full max-w-xs text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-2xl bg-red-500/15 text-red-500 flex items-center justify-center mx-auto mb-3"><Trash2 className="h-6 w-6" /></div>
+            <h3 className="font-bold text-[15px] mb-1">{confirmDelete.type === "bulk" ? `למחוק ${selected.size} חשבוניות?` : "למחוק את החשבונית?"}</h3>
+            <p className="text-[12.5px] text-muted-foreground mb-4">בטוח שברצונך למחוק?</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 h-10 rounded-xl glass text-[14px] font-medium">ביטול</button>
+              <button
+                onClick={() => {
+                  if (confirmDelete.type === "bulk") bulkDelete();
+                  else if (confirmDelete.id) deleteOne(confirmDelete.id);
+                  setConfirmDelete(null);
+                }}
+                className="flex-1 h-10 rounded-xl bg-red-600 text-white text-[14px] font-semibold"
+              >
+                מחק
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -735,7 +752,7 @@ export default function PendingInvoicesPage() {
                       <div className="flex items-center gap-2">
                         <button onClick={() => saveEdit(inv.id)} className="flex-1 h-10 rounded-xl glass text-[14px] font-medium">שמור בלבד</button>
                         <button onClick={() => setEditingId(null)} className="flex-1 h-10 rounded-xl glass text-[14px] font-medium text-muted-foreground">ביטול</button>
-                        <button onClick={() => deleteOne(inv.id)} disabled={deleting === inv.id} className="h-10 w-10 shrink-0 rounded-xl glass text-red-500 flex items-center justify-center" aria-label="מחק">
+                        <button onClick={() => setConfirmDelete({ type: "single", id: inv.id })} disabled={deleting === inv.id} className="h-10 w-10 shrink-0 rounded-xl glass text-red-500 flex items-center justify-center" aria-label="מחק">
                           {deleting === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                         </button>
                       </div>
@@ -766,8 +783,17 @@ export default function PendingInvoicesPage() {
                     <button onClick={() => approveOne(inv.id)} disabled={approving === inv.id} className="h-9 rounded-xl text-white text-[13px] font-semibold flex items-center justify-center gap-1.5" style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
                       {approving === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} אשר
                     </button>
-                    <button onClick={() => startEdit(inv)} className="h-9 rounded-xl glass text-[13px] font-semibold flex items-center justify-center gap-1.5"><Pencil className="h-3.5 w-3.5" /> ערוך</button>
-                    <button onClick={() => markPrivate(inv.id)} disabled={approving === inv.id} className="h-9 rounded-xl bg-muted/70 text-muted-foreground text-[13px] font-semibold flex items-center justify-center gap-1.5"><Lock className="h-3.5 w-3.5" /> פרטי</button>
+                    <button onClick={() => { setConfirmPrivateId(null); startEdit(inv); }} className="h-9 rounded-xl glass text-[13px] font-semibold flex items-center justify-center gap-1.5"><Pencil className="h-3.5 w-3.5" /> ערוך</button>
+                    <button
+                      onClick={() => {
+                        if (confirmPrivateId === inv.id) { markPrivate(inv.id); setConfirmPrivateId(null); }
+                        else setConfirmPrivateId(inv.id);
+                      }}
+                      disabled={approving === inv.id}
+                      className={`h-9 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-colors ${confirmPrivateId === inv.id ? "bg-slate-600 text-white" : "bg-muted/70 text-muted-foreground"}`}
+                    >
+                      <Lock className="h-3.5 w-3.5" /> {confirmPrivateId === inv.id ? "בטוח?" : "פרטי"}
+                    </button>
                   </div>
                 </div>
               ) : (
