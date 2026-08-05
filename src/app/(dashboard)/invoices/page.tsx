@@ -143,6 +143,13 @@ export default function InvoicesPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Lock background scroll while the filter sheet is open.
+  useEffect(() => {
+    if (!showFilters) return;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [showFilters]);
+
   // Mirror optimistic (send/unapprove/delete) changes into the cache for the next visit.
   useEffect(() => { approvedCache = { invoices, accountantEmail, senderAccounts }; }, [invoices, accountantEmail, senderAccounts]);
 
@@ -417,11 +424,16 @@ export default function InvoicesPage() {
       {/* Advanced filter — bottom sheet anchored to bottom-0 (reaches the edge);
           overflow-x hidden; dates stacked to avoid iOS overlap */}
       {showFilters && (
-        <>
-          <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-[2px]" onClick={() => setShowFilters(false)} />
+        <div
+          className="fixed inset-x-0 top-0 z-[90] flex flex-col justify-end"
+          style={{ height: "var(--app-height, 100vh)", touchAction: "none" }}
+          onClick={() => setShowFilters(false)}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
           <div
-            className="fixed inset-x-0 bottom-0 z-[91] mx-auto w-full sm:max-w-md glass rounded-t-3xl p-4 max-h-[88vh] overflow-y-auto overflow-x-hidden overscroll-contain"
-            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+            className="relative mx-auto w-full sm:max-w-md glass rounded-t-3xl p-4 max-h-full overflow-y-auto overflow-x-hidden overscroll-contain"
+            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))", touchAction: "pan-y" }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold flex items-center gap-2"><SlidersHorizontal className="h-4 w-4" /> מיון וסינון</h3>
@@ -487,7 +499,7 @@ export default function InvoicesPage() {
               <button onClick={() => setShowFilters(false)} className="flex-[2] h-11 rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold">הצג {filtered.length} תוצאות</button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Selection bar — hidden until the user starts marking */}
@@ -513,7 +525,7 @@ export default function InvoicesPage() {
         const inv = invoices.find((i) => i.id === previewId);
         const isHtml = inv?.fileName.endsWith(".html");
         return (
-          <div className="fixed inset-0 z-[100] bg-black flex flex-col" onClick={() => setPreviewId(null)}>
+          <div className="fixed inset-x-0 top-0 z-[100] bg-black flex flex-col" style={{ height: "var(--app-height, 100vh)" }} onClick={() => setPreviewId(null)}>
             <div
               className="shrink-0 flex items-center justify-between px-4 pb-2 text-white/90"
               style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}

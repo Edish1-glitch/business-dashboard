@@ -7,6 +7,7 @@ import { SyncProvider } from "@/components/providers/SyncProvider";
 import { PendingCountProvider } from "@/components/providers/PendingCountProvider";
 import { UploadProvider } from "@/components/providers/UploadProvider";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { AppHeightVar } from "@/components/AppHeightVar";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -71,6 +72,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground" suppressHydrationWarning>
         <ServiceWorkerRegister />
+        <AppHeightVar />
         <SessionProvider>
           <ThemeProvider>
             <SyncProvider>
