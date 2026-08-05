@@ -53,6 +53,8 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // no pinch-zoom on the whole app (native feel)
   viewportFit: "cover",
 };
 

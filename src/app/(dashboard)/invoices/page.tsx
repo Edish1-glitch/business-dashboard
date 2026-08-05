@@ -419,7 +419,7 @@ export default function InvoicesPage() {
         <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center" onClick={() => setShowFilters(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
           <div
-            className="relative w-full sm:max-w-md glass rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto"
+            className="relative w-full sm:max-w-md glass rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto overscroll-contain"
             style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -507,8 +507,12 @@ export default function InvoicesPage() {
         const inv = invoices.find((i) => i.id === previewId);
         const isHtml = inv?.fileName.endsWith(".html");
         return (
-          <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4" onClick={() => setPreviewId(null)}>
-            <div className="bg-white rounded-2xl overflow-hidden max-w-2xl max-h-[85vh] w-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center px-3"
+            style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))", paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+            onClick={() => setPreviewId(null)}
+          >
+            <div className="bg-white rounded-2xl overflow-hidden max-w-2xl max-h-full w-full flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-3 bg-white border-b shrink-0">
                 <span className="text-sm font-medium text-gray-700">תצוגה מקדימה</span>
                 <button onClick={() => setPreviewId(null)} className="p-1 rounded-lg hover:bg-gray-100"><X className="h-5 w-5 text-gray-500" /></button>
@@ -516,7 +520,7 @@ export default function InvoicesPage() {
               {isHtml ? (
                 <iframe src={`/api/invoices/${previewId}/preview`} className="w-full flex-1 min-h-[60vh]" sandbox="allow-same-origin" title="preview" />
               ) : (
-                <div className="overflow-auto flex-1"><img src={`/api/invoices/${previewId}/preview`} alt="preview" className="w-full" /></div>
+                <div className="overflow-auto overscroll-contain flex-1"><img src={`/api/invoices/${previewId}/preview`} alt="preview" className="w-full" /></div>
               )}
             </div>
           </div>

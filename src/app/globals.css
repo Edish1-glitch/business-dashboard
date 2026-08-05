@@ -122,11 +122,30 @@
     @apply border-border outline-ring/50;
     -webkit-tap-highlight-color: transparent;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    /* Native-app feel: no horizontal drift, no rubber-band overscroll that
+       reveals a gap under sheets/modals. `clip` (not `hidden`) avoids creating a
+       scroll container that would break the sticky header / selection bars. */
+    overflow-x: clip;
+    overscroll-behavior: none;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overscroll-behavior: none;
+    /* Kill the long-press "Copy / Look Up" callout + text selection on the UI —
+       it makes the app feel like a website. Re-enabled on real inputs below. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  /* ...but allow selection/callout exactly where the user types. */
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
   }
   /* Prevent Safari focus outline on chart SVGs */
   svg:focus,
