@@ -11,6 +11,14 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user }) {
+      // Allowlist: if ALLOWED_EMAILS is set (comma-separated), only those
+      // addresses may sign in — closes public sign-up on the shared instance.
+      // Unset ⇒ open (so a missing env never locks anyone out).
+      const allow = (process.env.ALLOWED_EMAILS || "")
+        .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+      if (allow.length > 0 && (!user.email || !allow.includes(user.email.toLowerCase()))) {
+        return false;
+      }
       if (user.email) {
         try {
           const { prisma } = await import("@/lib/db");

@@ -189,8 +189,9 @@ export async function countPageBuffers(buffer: Buffer, originalName: string): Pr
  * Get current total R2 storage used by checking DB.
  */
 export async function getTotalStorageUsed(): Promise<number> {
-  const result = await prisma.$queryRawUnsafe<[{ total: bigint | null }]>(
-    `SELECT COALESCE(SUM(LENGTH("fileData")), 0) + COALESCE(SUM(CASE WHEN "filePath" LIKE 'r2://%' THEN 100000 ELSE 0 END), 0) as total FROM "Invoice"`
-  );
+  const result = await prisma.$queryRaw<[{ total: bigint | null }]>`
+    SELECT COALESCE(SUM(LENGTH("fileData")), 0)
+         + COALESCE(SUM(CASE WHEN "filePath" LIKE 'r2://%' THEN 100000 ELSE 0 END), 0) AS total
+    FROM "Invoice"`;
   return Number(result[0]?.total || 0);
 }

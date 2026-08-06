@@ -64,6 +64,17 @@ async function convertHtmlToPdf(html: string): Promise<Buffer> {
 
   try {
     const page = await browser.newPage();
+    // SSRF hardening: invoice HTML is UNTRUSTED (it arrives by email). Disable JS
+    // and block every subresource except inline data: URIs — so a crafted
+    // <img src="http://169.254.169.254/…"> / fetch() can't make the server reach
+    // cloud-metadata or internal endpoints. Receipts render fine (text/inline).
+    await page.setJavaScriptEnabled(false);
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const url = req.url();
+      if (req.isNavigationRequest() || url.startsWith("data:")) req.continue();
+      else req.abort();
+    });
     await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 });
     const pdf = await page.pdf({
       format: "A4",

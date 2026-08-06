@@ -36,15 +36,14 @@ export interface SyncResult {
  * Decoded bytes ≈ base64 length * 0.75 for DB-stored files, ~200KB per R2 file.
  */
 export async function getStorageUsed(): Promise<number> {
-  const rows = await prisma.$queryRawUnsafe<[{ total: number | null }]>(
-    `SELECT COALESCE(SUM(
+  const rows = await prisma.$queryRaw<[{ total: number | null }]>`
+    SELECT COALESCE(SUM(
         CASE
           WHEN "fileData" IS NOT NULL THEN LENGTH("fileData") * 0.75
           WHEN "filePath" LIKE 'r2://%' THEN 204800
           ELSE 0
         END
-      ), 0)::float8 AS total FROM "Invoice"`
-  );
+      ), 0)::float8 AS total FROM "Invoice"`;
   return Number(rows[0]?.total ?? 0);
 }
 

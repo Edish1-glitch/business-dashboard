@@ -11,7 +11,6 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/auth") ||
     pathname === "/login" ||
-    pathname === "/api/debug-env" ||
     pathname === "/tour" ||
     pathname === "/api/email-accounts/callback" ||
     pathname.startsWith("/api/cron") ||
