@@ -1,5 +1,6 @@
 "use client";
 import { categoryColors } from "@/lib/category-colors";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
@@ -78,6 +79,7 @@ export default function PendingInvoicesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [focusHandled, setFocusHandled] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null); // expanded card showing אשר/ערוך/פרטי
+  const isDesktop = useIsDesktop(); // desktop → open the side-by-side editor directly on tap
   const [confirmPrivateId, setConfirmPrivateId] = useState<string | null>(null); // "פרטי" needs a 2nd tap
   const [confirmDelete, setConfirmDelete] = useState<{ type: "single" | "bulk"; id?: string } | null>(null);
 
@@ -681,12 +683,12 @@ export default function PendingInvoicesPage() {
               ) : isEditing ? (
                 /* ===== EDIT (spacious inline card) ===== */
                 <div className="flex flex-col md:flex-row-reverse">
-                  <div className="group relative md:w-2/5 shrink-0 border-b md:border-b-0 md:border-r border-border/60">
-                    <div className="bg-white h-32 md:h-auto md:max-h-[560px] overflow-hidden md:overflow-auto flex items-start justify-center">
+                  <div className="group relative md:w-2/5 lg:w-[54%] shrink-0 border-b md:border-b-0 md:border-r border-border/60">
+                    <div className="bg-white h-32 md:h-auto md:max-h-[560px] lg:max-h-[74vh] overflow-hidden md:overflow-auto flex items-start justify-center">
                       {inv.fileName.endsWith(".html") ? (
-                        <iframe src={`/api/invoices/${inv.id}/preview`} className="w-full h-32 md:h-[560px] pointer-events-none" sandbox="allow-same-origin" title="preview" />
+                        <iframe src={`/api/invoices/${inv.id}/preview`} className="w-full h-32 md:h-[560px] lg:h-[74vh] pointer-events-none" sandbox="allow-same-origin" title="preview" />
                       ) : (
-                        <img src={`/api/invoices/${inv.id}/preview`} alt="preview" className="w-full h-full md:h-auto object-cover object-top" draggable={false} />
+                        <img src={`/api/invoices/${inv.id}/preview`} alt="preview" onClick={() => setPreviewId(inv.id)} className="w-full h-full md:h-auto object-cover object-top md:cursor-zoom-in" draggable={false} />
                       )}
                     </div>
                     {/* Mobile: tap anywhere to enlarge (fixed-height, non-scrolling) */}
@@ -698,7 +700,7 @@ export default function PendingInvoicesPage() {
                       הגדלה
                     </button>
                   </div>
-                  <div className="md:w-3/5 p-3.5 sm:p-5 space-y-3">
+                  <div className="md:w-3/5 lg:w-[46%] p-3.5 sm:p-5 space-y-3">
                     <div className="space-y-2.5">
                       <div>
                         <label className="text-[12px] font-semibold mb-1 block">ספק</label>
@@ -828,7 +830,7 @@ export default function PendingInvoicesPage() {
                   <button onClick={() => { if (longPressFired.current) return; setPreviewId(inv.id); }} className="shrink-0 w-11 h-11 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
                     {inv.fileName.endsWith(".html") ? <Mail className="h-5 w-5 text-muted-foreground/40" /> : <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />}
                   </button>
-                  <button onClick={() => { if (longPressFired.current) return; setOpenId(inv.id); }} className="flex-1 min-w-0 text-start flex items-center gap-2">
+                  <button onClick={() => { if (longPressFired.current) return; isDesktop ? startEdit(inv) : setOpenId(inv.id); }} className="flex-1 min-w-0 text-start flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="font-bold text-[14px] truncate block">{inv.vendor || inv.fileName}</span>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">

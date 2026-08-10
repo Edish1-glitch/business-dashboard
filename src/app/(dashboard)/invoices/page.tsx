@@ -700,9 +700,9 @@ export default function InvoicesPage() {
               </div>
               )}
 
-              {/* expanded — send history + secondary actions */}
+              {/* expanded (MOBILE) — send history + secondary actions */}
               {open && !selectionMode && (
-                <div className="px-3 pb-3 pt-0 space-y-2">
+                <div className="lg:hidden px-3 pb-3 pt-0 space-y-2">
                   {isSent && (
                     <div className="space-y-1">
                       {inv.sends.map((s, i) => (
@@ -740,6 +740,77 @@ export default function InvoicesPage() {
                     <button onClick={() => setConfirmAction({ type: "delete", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-red-400 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
                       <Trash2 className="h-3.5 w-3.5" /> מחק
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* expanded (DESKTOP) — invoice left + details/actions right */}
+              {open && !selectionMode && (
+                <div className="hidden lg:flex flex-row-reverse border-t border-border/60">
+                  {/* Preview (left) — click to zoom */}
+                  <div className="group relative w-[54%] shrink-0">
+                    <div className="bg-white max-h-[70vh] overflow-auto flex items-start justify-center">
+                      {inv.fileName.endsWith(".html") ? (
+                        <iframe src={`/api/invoices/${inv.id}/preview`} className="w-full h-[70vh] pointer-events-none" sandbox="allow-same-origin" title="preview" />
+                      ) : (
+                        <img src={`/api/invoices/${inv.id}/preview`} alt="preview" onClick={() => setPreviewId(inv.id)} className="w-full object-cover object-top cursor-zoom-in" draggable={false} />
+                      )}
+                    </div>
+                    <button type="button" onClick={() => setPreviewId(inv.id)} className="absolute top-2 left-2 z-10 px-2.5 py-1 rounded-full bg-black/60 text-white text-[11px] font-medium backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">הגדלה</button>
+                  </div>
+                  {/* Details + actions (right) */}
+                  <div className="w-[46%] p-5 flex flex-col gap-3.5 border-l border-border/60">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-black text-[17px]">{inv.vendor || inv.fileName}</span>
+                        {inv.amount !== null ? <span className="font-black text-[17px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[12px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[12px] text-muted-foreground">
+                        {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
+                        {inv.date && <span>{fmtDate(inv.date)}</span>}
+                        {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-3 w-3" /> פרטי</span>}
+                        {isSent ? <span className="text-emerald-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> נשלח{inv.sends.length > 1 ? ` (${inv.sends.length})` : ""}</span> : inv.isBusiness !== false ? <span className="text-amber-500 font-medium">ממתין לשליחה</span> : null}
+                      </div>
+                    </div>
+                    {isSent && (
+                      <div className="space-y-1">
+                        {inv.sends.map((s, i) => (
+                          <div key={s.id || i} className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-2.5 py-1.5">
+                            <Send className="h-3 w-3 text-emerald-500 shrink-0" />
+                            <span className="font-medium text-foreground">{s.sentTo}</span><span>·</span><span>{fmtDate(s.createdAt)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Primary action — send only for business */}
+                    {inv.isBusiness === false ? (
+                      <div className="flex items-center gap-2 text-[13px] text-muted-foreground bg-muted/50 rounded-xl px-3.5 py-3">
+                        <Lock className="h-4 w-4 shrink-0" /> הוצאה פרטית — לא נשלחת לרו״ח
+                      </div>
+                    ) : (
+                      <button onClick={() => setSendTargetIds([inv.id])} className="w-full h-11 rounded-xl text-white text-[15px] font-bold flex items-center justify-center gap-2" style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
+                        {isSent ? <CornerUpLeft className="h-4 w-4" /> : <Send className="h-4 w-4" />} {isSent ? "שלח שוב לרו״ח" : "שלח לרו״ח"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleBusiness(inv)}
+                      disabled={busyToggle === inv.id}
+                      className={`w-full flex items-center justify-center gap-1.5 text-[13px] font-medium px-3 py-2.5 rounded-xl transition-colors disabled:opacity-60 ${inv.isBusiness === false ? "bg-violet-500/10 text-violet-600 dark:text-violet-300 hover:bg-violet-500/15" : "bg-muted/60 text-muted-foreground hover:bg-muted"}`}
+                    >
+                      {busyToggle === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : inv.isBusiness === false ? <><Building2 className="h-3.5 w-3.5" /> שנה להוצאה עסקית</> : <><Lock className="h-3.5 w-3.5" /> שנה להוצאה פרטית</>}
+                    </button>
+                    <div className="flex items-center gap-1.5 mt-auto pt-1">
+                      <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
+                        <Download className="h-3.5 w-3.5" /> הורדה
+                      </button>
+                      <button onClick={() => setConfirmAction({ type: "unapprove", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
+                        <Undo2 className="h-3.5 w-3.5" /> החזר לעריכה
+                      </button>
+                      <div className="flex-1" />
+                      <button onClick={() => setConfirmAction({ type: "delete", invoiceId: inv.id, vendorName: inv.vendor || inv.fileName })} className="flex items-center gap-1.5 text-[13px] text-red-400 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" /> מחק
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
