@@ -26,6 +26,7 @@ import {
   ChevronRight,
   CornerUpLeft,
   Building2,
+  Lock,
   ArrowUpDown,
   SlidersHorizontal,
 } from "lucide-react";
@@ -73,6 +74,7 @@ interface SenderAccount {
 
 type SortKey = "created" | "amount" | "date" | "vendor";
 type SentFilter = "all" | "sent" | "unsent";
+type ScopeFilter = "all" | "business" | "private";
 
 const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", ILS: "₪" };
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString("he-IL");
@@ -89,6 +91,8 @@ export default function InvoicesPage() {
   // filters / sort / search
   const [filterCategory, setFilterCategory] = useState("");
   const [sentFilter, setSentFilter] = useState<SentFilter>("all");
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all"); // business / private
+  const [busyToggle, setBusyToggle] = useState<string | null>(null); // id being reclassified
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
   const [sortAsc, setSortAsc] = useState(false);
@@ -167,6 +171,8 @@ export default function InvoicesPage() {
     if (filterCategory) list = list.filter((inv) => inv.category?.name === filterCategory);
     if (sentFilter === "sent") list = list.filter((inv) => inv.sends.length > 0);
     if (sentFilter === "unsent") list = list.filter((inv) => inv.sends.length === 0);
+    if (scopeFilter === "business") list = list.filter((inv) => inv.isBusiness !== false);
+    if (scopeFilter === "private") list = list.filter((inv) => inv.isBusiness === false);
     // date range (compares the YYYY-MM-DD part; invoices with no date are excluded when a bound is set)
     if (dateFrom) list = list.filter((inv) => inv.date && inv.date.slice(0, 10) >= dateFrom);
     if (dateTo) list = list.filter((inv) => inv.date && inv.date.slice(0, 10) <= dateTo);
@@ -194,7 +200,7 @@ export default function InvoicesPage() {
       return sortAsc ? cmp : -cmp;
     });
     return list;
-  }, [invoices, filterCategory, sentFilter, searchQuery, sortKey, sortAsc, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
+  }, [invoices, filterCategory, sentFilter, scopeFilter, searchQuery, sortKey, sortAsc, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
 
   const activeFilterCount = [dateFrom, dateTo, amountMin, amountMax, amountCurrency, filterCategory].filter(Boolean).length;
   const clearFilters = () => { setDateFrom(""); setDateTo(""); setAmountMin(""); setAmountMax(""); setAmountCurrency(""); setFilterCategory(""); };
@@ -206,7 +212,7 @@ export default function InvoicesPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, safePage, pageSize]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchQuery, filterCategory, sentFilter, sortKey, sortAsc, pageSize, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, filterCategory, sentFilter, scopeFilter, sortKey, sortAsc, pageSize, dateFrom, dateTo, amountMin, amountMax, amountCurrency]);
 
   // stats
   const stats = useMemo(() => {
@@ -216,7 +222,8 @@ export default function InvoicesPage() {
       const cur = inv.currency || "ILS";
       byCurrency[cur] = (byCurrency[cur] || 0) + inv.amount;
     }
-    const unsent = invoices.filter((i) => i.sends.length === 0).length;
+    // Private expenses are never sent to the accountant → not "pending send".
+    const unsent = invoices.filter((i) => i.sends.length === 0 && i.isBusiness !== false).length;
     return { count: invoices.length, byCurrency, unsent };
   }, [invoices]);
 
@@ -247,7 +254,7 @@ export default function InvoicesPage() {
     const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
     const ids = invoices
-      .filter((inv) => inv.sends.length === 0 && inv.date && new Date(inv.date) >= start && new Date(inv.date) <= end)
+      .filter((inv) => inv.sends.length === 0 && inv.isBusiness !== false && inv.date && new Date(inv.date) >= start && new Date(inv.date) <= end)
       .map((inv) => inv.id);
     setSelected(new Set(ids));
     if (ids.length === 0) alert("אין חשבוניות מהחודש שעבר שלא נשלחו");
@@ -269,6 +276,27 @@ export default function InvoicesPage() {
 
   const formatAmount = (amount: number, currency?: string | null) =>
     `${CURRENCY_SYMBOL[currency || "ILS"] || "₪"}${amount.toLocaleString("he-IL")}`;
+
+  // Reclassify an approved invoice business↔private. The server keeps the linked
+  // expense in sync so the dashboard split follows. Optimistic local update.
+  const toggleBusiness = async (inv: Invoice) => {
+    const next = inv.isBusiness === false; // private → business, else → private
+    setBusyToggle(inv.id);
+    setInvoices((prev) => prev.map((i) => (i.id === inv.id ? { ...i, isBusiness: next } : i)));
+    try {
+      const res = await fetch(`/api/invoices/${inv.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isBusiness: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setInvoices((prev) => prev.map((i) => (i.id === inv.id ? { ...i, isBusiness: !next } : i))); // revert
+      alert("שגיאה בשינוי סיווג");
+    } finally {
+      setBusyToggle(null);
+    }
+  };
 
   const downloadSelected = async () => {
     if (selected.size === 0) return;
@@ -397,6 +425,17 @@ export default function InvoicesPage() {
             {label}
           </button>
         ))}
+        {/* Business / private scope — toggle chips (tap again to clear) */}
+        <span className="shrink-0 w-px h-5 bg-border/60 mx-0.5" />
+        {([["business", "עסקי", Building2], ["private", "פרטי", Lock]] as [ScopeFilter, string, typeof Building2][]).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            onClick={() => setScopeFilter((s) => (s === key ? "all" : key))}
+            className={`shrink-0 h-8 px-3.5 rounded-full text-[12px] font-medium transition-colors flex items-center gap-1 ${scopeFilter === key ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25" : "glass text-muted-foreground"}`}
+          >
+            <Icon className="h-3.5 w-3.5" /> {label}
+          </button>
+        ))}
         {categoryList.length > 0 && <span className="shrink-0 w-px h-5 bg-border/60 mx-0.5" />}
         {categoryList.slice(0, 6).map((name) => (
           <button
@@ -410,10 +449,10 @@ export default function InvoicesPage() {
       </div>
 
       {/* Active-filter summary */}
-      {(searchQuery || activeFilterCount > 0 || sentFilter !== "all") && (
+      {(searchQuery || activeFilterCount > 0 || sentFilter !== "all" || scopeFilter !== "all") && (
         <div className="flex items-center justify-between px-1">
           <span className="text-[12px] text-muted-foreground">{filtered.length} תוצאות</span>
-          <button onClick={() => { clearFilters(); setSentFilter("all"); setSearchQuery(""); }} className="text-[12px] text-red-500 hover:text-red-600 flex items-center gap-1">
+          <button onClick={() => { clearFilters(); setSentFilter("all"); setScopeFilter("all"); setSearchQuery(""); }} className="text-[12px] text-red-500 hover:text-red-600 flex items-center gap-1">
             <X className="h-3.5 w-3.5" /> נקה
           </button>
         </div>
@@ -493,7 +532,7 @@ export default function InvoicesPage() {
               </button>
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => { clearFilters(); setSentFilter("all"); }} className="flex-1 h-11 rounded-xl glass text-[14px] font-medium text-muted-foreground">נקה הכל</button>
+              <button onClick={() => { clearFilters(); setSentFilter("all"); setScopeFilter("all"); }} className="flex-1 h-11 rounded-xl glass text-[14px] font-medium text-muted-foreground">נקה הכל</button>
               <button onClick={() => setShowFilters(false)} className="flex-[2] h-11 rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold">הצג {filtered.length} תוצאות</button>
             </div>
           </div>
@@ -607,7 +646,8 @@ export default function InvoicesPage() {
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                       {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
                       {inv.date && <span>{fmtDate(inv.date)}</span>}
-                      {isSent ? <span className="text-emerald-600 font-medium">נשלח</span> : <span className="text-amber-500 font-medium">ממתין לשליחה</span>}
+                      {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
+                      {isSent ? <span className="text-emerald-600 font-medium">נשלח</span> : inv.isBusiness !== false ? <span className="text-amber-500 font-medium">ממתין לשליחה</span> : null}
                     </div>
                   </div>
                 </div>
@@ -625,27 +665,38 @@ export default function InvoicesPage() {
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                       {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
                       {inv.date && <span>{fmtDate(inv.date)}</span>}
-                      {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">פרטי</span>}
+                      {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
+                      {/* Private isn't sent to the accountant → no "pending send" nag */}
                       {isSent ? (
                         <span className="text-emerald-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="h-2.5 w-2.5" /> נשלח{inv.sends.length > 1 ? ` (${inv.sends.length})` : ""}</span>
-                      ) : (
+                      ) : inv.isBusiness !== false ? (
                         <span className="text-amber-500 font-medium">ממתין לשליחה</span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   {inv.amount !== null ? <span className="font-black text-[15px] tnum shrink-0">{formatAmount(inv.amount, inv.currency)}</span> : <span className="text-[11px] text-muted-foreground/50 shrink-0">ללא סכום</span>}
                 </button>
 
-                {/* Send / Resend — violet paper-plane (brand colour) */}
-                <button
-                  onClick={() => { if (longPressFired.current) return; setSendTargetIds([inv.id]); }}
-                  title={isSent ? "שלח שוב לרו״ח" : "שלח לרו״ח"}
-                  aria-label={isSent ? "שלח שוב" : "שלח"}
-                  className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-transform active:scale-95 ${isSent ? "glass text-violet-600 dark:text-violet-400" : "text-white shadow-md shadow-violet-500/25"}`}
-                  style={isSent ? undefined : { background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}
-                >
-                  {isSent ? <CornerUpLeft className="h-[18px] w-[18px]" /> : <Send className="h-[18px] w-[18px]" strokeWidth={2.4} />}
-                </button>
+                {/* Private expenses aren't sent to the accountant — show a quiet
+                    lock marker instead of the send button. Business ⇒ send/resend. */}
+                {inv.isBusiness === false ? (
+                  <div
+                    title="הוצאה פרטית — לא נשלחת לרו״ח"
+                    className="shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center glass text-muted-foreground/60"
+                  >
+                    <Lock className="h-[17px] w-[17px]" />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { if (longPressFired.current) return; setSendTargetIds([inv.id]); }}
+                    title={isSent ? "שלח שוב לרו״ח" : "שלח לרו״ח"}
+                    aria-label={isSent ? "שלח שוב" : "שלח"}
+                    className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-transform active:scale-95 ${isSent ? "glass text-violet-600 dark:text-violet-400" : "text-white shadow-md shadow-violet-500/25"}`}
+                    style={isSent ? undefined : { background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}
+                  >
+                    {isSent ? <CornerUpLeft className="h-[18px] w-[18px]" /> : <Send className="h-[18px] w-[18px]" strokeWidth={2.4} />}
+                  </button>
+                )}
               </div>
               )}
 
@@ -664,6 +715,20 @@ export default function InvoicesPage() {
                       ))}
                     </div>
                   )}
+                  {/* Reclassify business ↔ private */}
+                  <button
+                    onClick={() => toggleBusiness(inv)}
+                    disabled={busyToggle === inv.id}
+                    className={`w-full flex items-center justify-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-xl transition-colors disabled:opacity-60 ${inv.isBusiness === false ? "bg-violet-500/10 text-violet-600 dark:text-violet-300 hover:bg-violet-500/15" : "bg-muted/60 text-muted-foreground hover:bg-muted"}`}
+                  >
+                    {busyToggle === inv.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : inv.isBusiness === false ? (
+                      <><Building2 className="h-3.5 w-3.5" /> שנה להוצאה עסקית</>
+                    ) : (
+                      <><Lock className="h-3.5 w-3.5" /> שנה להוצאה פרטית</>
+                    )}
+                  </button>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => window.open(`/api/invoices/${inv.id}/download`, "_blank")} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors">
                       <Download className="h-3.5 w-3.5" /> הורדה

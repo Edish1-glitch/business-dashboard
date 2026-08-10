@@ -44,6 +44,16 @@ export async function PATCH(
       include: { category: true },
     });
 
+    // Keep the linked expense in sync so the dashboard business/private split
+    // reflects a reclassification done after approval. No-op for un-approved
+    // invoices (they have no expense row yet).
+    if (isBusiness !== undefined) {
+      await prisma.expense.updateMany({
+        where: { invoiceId: id },
+        data: { isBusiness: Boolean(isBusiness) },
+      });
+    }
+
     return NextResponse.json({ invoice });
   } catch (error) {
     console.error("Invoice update error:", error);
