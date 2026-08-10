@@ -27,3 +27,20 @@ test("selection bar exposes CSV, send and download for the selected", async ({ p
   await expect(page.getByRole("button", { name: "שלח", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "הורד" })).toBeVisible();
 });
+
+test("private invoices can't be picked for bulk send", async ({ page }) => {
+  await mockInvoices(page, {
+    approved: [
+      makeInvoice({ status: "approved", vendor: "ספק עסקי", isBusiness: true, sends: [] }),
+      makeInvoice({ status: "approved", vendor: "ספק פרטי", isBusiness: false, sends: [] }),
+    ],
+  });
+  await page.goto("/invoices");
+  await page.getByRole("button", { name: "בחר", exact: true }).click();
+  // Select-all picks only the business invoice, not the private one.
+  await page.getByRole("button", { name: "בחר הכל", exact: true }).click();
+  await expect(page.getByText("1 נבחרו")).toBeVisible();
+  // Tapping the private row does nothing — it stays unselectable.
+  await page.getByText("ספק פרטי").click();
+  await expect(page.getByText("1 נבחרו")).toBeVisible();
+});

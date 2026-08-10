@@ -230,10 +230,13 @@ export default function InvoicesPage() {
   const canSendAny = senderAccounts.some((a) => a.canSend);
 
   // selection helpers
+  // Private expenses are never sent to the accountant, so they can't be picked
+  // for the bulk actions (send/export) — not individually and not via select-all.
+  const isSendable = (inv: Invoice) => inv.isBusiness !== false;
   const toggleSelect = (id: string) => setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleSelectAll = () => {
-    const ids = paginated.map((i) => i.id);
-    const all = ids.every((id) => selected.has(id));
+    const ids = paginated.filter(isSendable).map((i) => i.id);
+    const all = ids.length > 0 && ids.every((id) => selected.has(id));
     setSelected((prev) => { const n = new Set(prev); ids.forEach((id) => all ? n.delete(id) : n.add(id)); return n; });
   };
 
@@ -243,7 +246,7 @@ export default function InvoicesPage() {
   const startLongPress = (id: string) => {
     if (selectionMode) return;
     longPressFired.current = false;
-    longPressTimer.current = setTimeout(() => { longPressFired.current = true; setSelectionMode(true); setSelected(new Set([id])); }, 450);
+    longPressTimer.current = setTimeout(() => { longPressFired.current = true; setSelectionMode(true); const inv = invoices.find((i) => i.id === id); setSelected(new Set(inv && isSendable(inv) ? [id] : [])); }, 450);
   };
   const cancelLongPress = () => { if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; } };
   const exitSelection = () => { setSelectionMode(false); setSelected(new Set()); };
@@ -341,7 +344,8 @@ export default function InvoicesPage() {
     );
   }
 
-  const allSelected = paginated.length > 0 && paginated.every((i) => selected.has(i.id));
+  const selectablePaginated = paginated.filter(isSendable);
+  const allSelected = selectablePaginated.length > 0 && selectablePaginated.every((i) => selected.has(i.id));
 
   return (
     <div data-tour="invoices-list" className="space-y-3 max-w-5xl mx-auto">
@@ -557,7 +561,7 @@ export default function InvoicesPage() {
           >
             <FileDown className="h-3.5 w-3.5" />
           </button>
-          <button onClick={() => selected.size > 0 && setSendTargetIds([...selected])} disabled={selected.size === 0} className="h-8 px-3 rounded-lg text-white text-[12px] font-semibold flex items-center gap-1 disabled:opacity-40 shrink-0" style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
+          <button onClick={() => { const ids = [...selected].filter((id) => { const inv = invoices.find((i) => i.id === id); return inv ? isSendable(inv) : false; }); if (ids.length > 0) setSendTargetIds(ids); }} disabled={selected.size === 0} className="h-8 px-3 rounded-lg text-white text-[12px] font-semibold flex items-center gap-1 disabled:opacity-40 shrink-0" style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
             <Send className="h-3.5 w-3.5" /> שלח
           </button>
           <button onClick={downloadSelected} disabled={selected.size === 0} className="h-8 w-8 rounded-lg glass text-muted-foreground flex items-center justify-center disabled:opacity-40 shrink-0" aria-label="הורד">
@@ -630,10 +634,14 @@ export default function InvoicesPage() {
               className={`glass rounded-2xl overflow-hidden transition-all ${open && !selectionMode ? "ring-2 ring-violet-400/40" : ""} ${selectionMode && isSelected ? "ring-2 ring-violet-500/70" : ""}`}
             >
               {selectionMode ? (
-                /* ===== SELECTABLE ROW ===== */
-                <div className="p-3 flex items-center gap-3 cursor-pointer select-none" onClick={() => toggleSelect(inv.id)}>
+                /* ===== SELECTABLE ROW (private can't be picked for bulk send) ===== */
+                <div
+                  className={`p-3 flex items-center gap-3 select-none ${isSendable(inv) ? "cursor-pointer" : "cursor-not-allowed opacity-55"}`}
+                  onClick={() => { if (isSendable(inv)) toggleSelect(inv.id); }}
+                  title={isSendable(inv) ? undefined : "הוצאה פרטית — לא נשלחת לרו״ח"}
+                >
                   <div className="shrink-0">
-                    {isSelected ? <CheckCircle2 className="h-6 w-6 text-violet-500" /> : <Circle className="h-6 w-6 text-muted-foreground/40" />}
+                    {!isSendable(inv) ? <Lock className="h-[22px] w-[22px] text-muted-foreground/30" /> : isSelected ? <CheckCircle2 className="h-6 w-6 text-violet-500" /> : <Circle className="h-6 w-6 text-muted-foreground/40" />}
                   </div>
                   <div className="shrink-0 w-11 h-11 rounded-xl border border-border/40 overflow-hidden bg-white flex items-center justify-center">
                     {inv.fileName.endsWith(".html") ? <Mail className="h-5 w-5 text-muted-foreground/40" /> : <img src={`/api/invoices/${inv.id}/preview`} alt="" className="w-full h-full object-cover object-top" loading="lazy" />}
