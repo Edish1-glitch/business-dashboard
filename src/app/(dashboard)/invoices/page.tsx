@@ -109,6 +109,7 @@ export default function InvoicesPage() {
 
   // per-item ui
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewZoom, setPreviewZoom] = useState(false); // tap/click to zoom the preview
   const [openId, setOpenId] = useState<string | null>(null); // expanded card (actions + send history)
   const [confirmAction, setConfirmAction] = useState<{ type: "unapprove" | "delete"; invoiceId: string; vendorName: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -530,21 +531,45 @@ export default function InvoicesPage() {
       {previewId && (() => {
         const inv = invoices.find((i) => i.id === previewId);
         const isHtml = inv?.fileName.endsWith(".html");
+        const close = () => { setPreviewId(null); setPreviewZoom(false); };
+        // Fit the whole receipt on screen minus the header/gap (never a giant zoom);
+        // env() keeps it clear of the notch/home-indicator on iOS.
+        const fitBox = "calc(var(--app-height, 100dvh) - 6rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))";
         return (
-          <div className="fixed inset-x-0 top-0 z-[100] bg-black flex flex-col" style={{ height: "var(--app-height, 100vh)" }} onClick={() => setPreviewId(null)}>
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex flex-col" style={{ height: "var(--app-height, 100vh)" }} onClick={close}>
             <div
               className="shrink-0 flex items-center justify-between px-4 pb-2 text-white/90"
               style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
             >
               <span className="text-sm font-medium">תצוגה מקדימה</span>
-              <button onClick={() => setPreviewId(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-5 w-5" /></button>
+              <button onClick={close} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-5 w-5" /></button>
             </div>
-            <div className="flex-1 overflow-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
-              {isHtml ? (
-                <iframe src={`/api/invoices/${previewId}/preview`} className="w-full h-full min-h-full bg-white" sandbox="allow-same-origin" title="preview" />
-              ) : (
-                <img src={`/api/invoices/${previewId}/preview`} alt="preview" className="w-full bg-white" />
-              )}
+            {/* Clicking the gap (outside the bubble) closes; clicking the bubble zooms */}
+            <div className="flex-1 min-h-0 overflow-auto overscroll-contain p-4 md:p-8">
+              <div className="min-h-full flex items-center justify-center">
+                {isHtml ? (
+                  <iframe
+                    src={`/api/invoices/${previewId}/preview`}
+                    className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl"
+                    style={{ height: fitBox }}
+                    sandbox="allow-same-origin"
+                    title="preview"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <img
+                    src={`/api/invoices/${previewId}/preview`}
+                    alt="preview"
+                    onClick={(e) => { e.stopPropagation(); setPreviewZoom((z) => !z); }}
+                    className={
+                      previewZoom
+                        ? "w-full max-w-2xl bg-white rounded-2xl shadow-2xl cursor-zoom-out"
+                        : "max-w-full object-contain bg-white rounded-2xl shadow-2xl cursor-zoom-in"
+                    }
+                    style={previewZoom ? undefined : { maxHeight: fitBox }}
+                  />
+                )}
+              </div>
             </div>
           </div>
         );
