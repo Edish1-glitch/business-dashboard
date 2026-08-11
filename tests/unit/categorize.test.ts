@@ -65,6 +65,34 @@ describe("extractAmount", () => {
     expect(extractAmount(text)).toEqual({ amount: 30, currency: "ILS" });
   });
 
+  // Real bug: gross total, then a discount line, then the after-discount total —
+  // the parser recorded the PRE-discount price. Prefer the amount actually paid.
+  it("uses the after-discount total when a discount line is present", () => {
+    const text = 'סה"כ 100.00\nהנחה 10.00\nסה"כ לתשלום 90.00';
+    expect(extractAmount(text)).toEqual({ amount: 90, currency: "ILS" });
+  });
+
+  // Thermal OCR mangles the small final-total digits (85.00 -> "5.0"), so the only
+  // readable numbers are the gross and the discount. Fall back to gross − discount.
+  it("computes gross − discount when the final total is OCR-garbled", () => {
+    const text = [
+      'סה"כ לתשלום - שונות 106.50',
+      "הנחות/מבצעים 21.50",
+      'סה"כ לפני מע"מ 72,03',
+      'מע"מ 18.0% פריטים 12.099',
+      'סה"כ כולל מע"מ 5.0',
+      "אפליקציה 00",
+      "בעסקה זו צברת 8.50 ש\"ח",
+      'סה"כ כסף למימוש בילו - 14.27 ש"ח',
+    ].join("\n");
+    expect(extractAmount(text)).toEqual({ amount: 85, currency: "ILS" });
+  });
+
+  it("does not double-subtract when the total below the discount is readable", () => {
+    const text = 'סה"כ לתשלום - שונות 106.50\nהנחות/מבצעים 21.50\nהתקבל: אפליקציה 85.00';
+    expect(extractAmount(text)).toEqual({ amount: 85, currency: "ILS" });
+  });
+
   it("reads international $, €, £ totals", () => {
     expect(extractAmount("Total: $99.99")).toEqual({ amount: 99.99, currency: "USD" });
     expect(extractAmount("Amount Due: €50.00")).toEqual({ amount: 50, currency: "EUR" });

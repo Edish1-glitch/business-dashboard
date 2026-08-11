@@ -657,7 +657,7 @@ export default function InvoicesPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                       {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                      {inv.date && <span>{fmtDay(inv.date)}</span>}
+                      {inv.date ? <span>{fmtDay(inv.date)}</span> : <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">ללא תאריך</span>}
                       {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
                       {isSent ? <span className="text-emerald-600 font-medium">נשלח</span> : inv.isBusiness !== false ? <span className="text-amber-500 font-medium">ממתין לשליחה</span> : null}
                     </div>
@@ -676,7 +676,7 @@ export default function InvoicesPage() {
                     <span className="font-bold text-[14px] truncate block">{inv.vendor || inv.fileName}</span>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                       {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                      {inv.date && <span>{fmtDay(inv.date)}</span>}
+                      {inv.date ? <span>{fmtDay(inv.date)}</span> : <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">ללא תאריך</span>}
                       {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
                       {/* Private isn't sent to the accountant → no "pending send" nag */}
                       {isSent ? (
@@ -779,7 +779,7 @@ export default function InvoicesPage() {
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[12px] text-muted-foreground">
                         {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                        {inv.date && <span>{fmtDay(inv.date)}</span>}
+                        {inv.date ? <span>{fmtDay(inv.date)}</span> : <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">ללא תאריך</span>}
                         {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-3 w-3" /> פרטי</span>}
                         {isSent ? <span className="text-emerald-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> נשלח{inv.sends.length > 1 ? ` (${inv.sends.length})` : ""}</span> : inv.isBusiness !== false ? <span className="text-amber-500 font-medium">ממתין לשליחה</span> : null}
                       </div>

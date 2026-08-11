@@ -95,7 +95,83 @@ function parseNumericAmount(raw: string): number {
   return parseFloat(s);
 }
 
+/**
+ * Israeli receipts often print a GROSS total, then a discount/promotion line,
+ * then the real amount charged (after discount / incl. VAT / "received"). The
+ * naive "grab the first סה\"כ number" picked the pre-discount total, and thermal
+ * OCR frequently mangles the small final-total digits (85.00 -> "5.0"). This
+ * reads the totals block line-by-line and prefers the true amount paid:
+ *   - the "final" total BELOW the discount line (התקבל / כולל מע"מ / לתשלום), or
+ *   - GROSS − DISCOUNT when that final line is missing or OCR-garbled.
+ * Returns null when no Hebrew total labels are present so the caller can fall
+ * back to the plain ₪/ש"ח/currency patterns.
+ */
+function extractIsraeliLabeledTotal(text: string): { amount: number; currency: string } | null {
+  const round2 = (x: number) => Math.round(x * 100) / 100;
+  // The rightmost plausible number on a line (the amount sits after the label).
+  const lastNum = (ln: string): number | null => {
+    let out: number | null = null;
+    for (const m of ln.matchAll(/\d[\d.,]*/g)) {
+      const v = parseNumericAmount(m[0]);
+      if (Number.isFinite(v) && v > 0 && v < 10000000) out = v;
+    }
+    return out;
+  };
+
+  type Total = { kind: "paid" | "inclvat" | "pay" | "sum"; idx: number; value: number };
+  const totals: Total[] = [];
+  let discount: number | null = null;
+  let discIdx = -1;
+
+  text.split(/\r?\n/).forEach((ln, i) => {
+    // Skip pre-VAT subtotals and loyalty lines — never the charged amount.
+    if (/לפני\s+מע/.test(ln) || /למימוש|צבר[תה]|מימוש/.test(ln)) return;
+    if (/הנחו|מבצע|הנחה/.test(ln)) {
+      const n = lastNum(ln);
+      if (n != null && discount == null) { discount = n; discIdx = i; }
+      return;
+    }
+    const n = lastNum(ln);
+    if (n == null) return;
+    // "paid" lines are the actual charge — but "שולם בכרטיס ****4321" ends in a
+    // CARD number, not an amount, so ignore card/masked payment-method lines.
+    if (/(?:התקבל|שול[םמ])/.test(ln) && !/כרטיס|אשראי|ויזה|מאסטר|מסטר|\*{2,}/.test(ln))
+      totals.push({ kind: "paid", idx: i, value: n });
+    else if (/סה["״]?כ\s+כולל\s+מע/.test(ln)) totals.push({ kind: "inclvat", idx: i, value: n });
+    else if (/סה["״]?כ\s+לתשלום/.test(ln)) totals.push({ kind: "pay", idx: i, value: n });
+    else if (/(?:^|\s)(?:סה["״]?כ|סך\s+הכ["״]?ל)/.test(ln)) totals.push({ kind: "sum", idx: i, value: n });
+  });
+
+  if (totals.length === 0 && discount == null) return null;
+
+  if (discount != null && discIdx >= 0) {
+    const before = totals.filter((t) => t.idx < discIdx).map((t) => t.value);
+    const gross = before.length ? Math.max(...before) : null;
+    const belowFinals = totals.filter((t) => t.idx > discIdx).map((t) => t.value);
+    const netBelow = belowFinals.length ? Math.max(...belowFinals) : null;
+    if (gross != null && gross - discount > 0) {
+      const computed = round2(gross - discount);
+      // Trust the receipt's own after-discount total only if it corroborates the
+      // arithmetic (guards against an OCR-garbled "5.0" for 85.00).
+      if (netBelow != null && Math.abs(netBelow - computed) <= Math.max(1, computed * 0.4)) {
+        return { amount: netBelow, currency: "ILS" };
+      }
+      return { amount: computed, currency: "ILS" };
+    }
+    if (netBelow != null) return { amount: netBelow, currency: "ILS" };
+  }
+
+  // No usable discount adjustment: prefer received > incl-VAT > to-pay > generic total.
+  const first = (kind: Total["kind"]) => totals.find((t) => t.kind === kind)?.value ?? null;
+  const chosen = first("paid") ?? first("inclvat") ?? first("pay") ?? first("sum");
+  return chosen != null ? { amount: chosen, currency: "ILS" } : null;
+}
+
 export function extractAmount(text: string): { amount: number; currency: string } | null {
+  // Discount-aware Hebrew totals block first (real amount paid, after discounts).
+  const labeled = extractIsraeliLabeledTotal(text);
+  if (labeled) return labeled;
+
   // Israeli patterns (highest priority for Israeli invoices)
   const israeliPatterns: [RegExp, string][] = [
     [/סה"כ\s+כולל\s+מע["\u05F4]?מ\s*([\d,]+\.?\d*)/, "ILS"],

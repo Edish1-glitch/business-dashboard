@@ -675,7 +675,7 @@ export default function PendingInvoicesPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                       {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                      {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span>}
+                      {inv.date ? <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span> : <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">ללא תאריך</span>}
                       {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
                     </div>
                   </div>
@@ -725,7 +725,8 @@ export default function PendingInvoicesPage() {
                       <div className="grid grid-cols-2 gap-2.5">
                         <div className="min-w-0">
                           <label className="text-[12px] font-semibold mb-1 block">תאריך</label>
-                          <input type="date" value={typeof editData.date === "string" ? editData.date : ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className="w-full min-w-0 h-10 rounded-xl border border-input bg-background px-2.5 text-[13px] appearance-none" />
+                          <input type="date" value={typeof editData.date === "string" ? editData.date : ""} onChange={(e) => setEditData({ ...editData, date: e.target.value })} className={`w-full min-w-0 h-10 rounded-xl border bg-background px-2.5 text-[13px] appearance-none ${editData.date ? "border-input" : "border-amber-400"}`} />
+                          {!editData.date && <p className="text-[10.5px] text-amber-600 mt-1">לא זוהה תאריך — נא להזין ידנית</p>}
                         </div>
                         <div className="min-w-0">
                           <label className="text-[12px] font-semibold mb-1 block">4 ספרות כרטיס</label>
@@ -801,7 +802,7 @@ export default function PendingInvoicesPage() {
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                         {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                        {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span>}
+                        {inv.date ? <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span> : <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">ללא תאריך</span>}
                         {inv.creditCardLast4 && <span>· ****{inv.creditCardLast4}</span>}
                         {waitTime && <span className="text-amber-500">{waitTime}</span>}
                       </div>
@@ -835,7 +836,7 @@ export default function PendingInvoicesPage() {
                       <span className="font-bold text-[14px] truncate block">{inv.vendor || inv.fileName}</span>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                         {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                        {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span>}
+                        {inv.date ? <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span> : <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">ללא תאריך</span>}
                         {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
                         {waitTime && <span className="text-amber-500">{waitTime}</span>}
                       </div>
