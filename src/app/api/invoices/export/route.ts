@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const rows = invoices.map((inv) => ({
       ספק: inv.vendor || "",
       סכום: inv.amount?.toString() || "",
-      תאריך: inv.date ? new Date(inv.date).toLocaleDateString("he-IL") : "",
+      תאריך: inv.date ? new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" }) : "",
       קטגוריה: inv.category?.name || "",
       כרטיס: inv.creditCardLast4 || "",
       מקור: inv.source,

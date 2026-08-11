@@ -247,7 +247,7 @@ export default function DashboardPage() {
                         {inv.category && (
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryColors[inv.category.name] || "bg-gray-100 text-gray-700"}`}>{inv.category.name}</span>
                         )}
-                        {inv.date && <span className="text-[10.5px] text-muted-foreground">{new Date(inv.date).toLocaleDateString("he-IL")}</span>}
+                        {inv.date && <span className="text-[10.5px] text-muted-foreground">{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span>}
                       </div>
                     </div>
                     {inv.amount !== null && (

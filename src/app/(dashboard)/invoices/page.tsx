@@ -78,6 +78,10 @@ type ScopeFilter = "all" | "business" | "private";
 
 const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", ILS: "₪" };
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString("he-IL");
+// Invoice dates are a tz-proof calendar day (stored as midnight UTC) — format them
+// in UTC so the displayed day matches what was on the receipt regardless of the
+// viewer's timezone. `fmtDate` stays local for real timestamps like send times.
+const fmtDay = (d: string | Date) => new Date(d).toLocaleDateString("he-IL", { timeZone: "UTC" });
 
 // Stale-while-revalidate cache (module scope → persists across client-side
 // navigation) so revisiting shows the last data instantly instead of a blank
@@ -653,7 +657,7 @@ export default function InvoicesPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                       {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                      {inv.date && <span>{fmtDate(inv.date)}</span>}
+                      {inv.date && <span>{fmtDay(inv.date)}</span>}
                       {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
                       {isSent ? <span className="text-emerald-600 font-medium">נשלח</span> : inv.isBusiness !== false ? <span className="text-amber-500 font-medium">ממתין לשליחה</span> : null}
                     </div>
@@ -672,7 +676,7 @@ export default function InvoicesPage() {
                     <span className="font-bold text-[14px] truncate block">{inv.vendor || inv.fileName}</span>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                       {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                      {inv.date && <span>{fmtDate(inv.date)}</span>}
+                      {inv.date && <span>{fmtDay(inv.date)}</span>}
                       {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
                       {/* Private isn't sent to the accountant → no "pending send" nag */}
                       {isSent ? (
@@ -775,7 +779,7 @@ export default function InvoicesPage() {
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[12px] text-muted-foreground">
                         {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                        {inv.date && <span>{fmtDate(inv.date)}</span>}
+                        {inv.date && <span>{fmtDay(inv.date)}</span>}
                         {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 flex items-center gap-0.5"><Lock className="h-3 w-3" /> פרטי</span>}
                         {isSent ? <span className="text-emerald-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> נשלח{inv.sends.length > 1 ? ` (${inv.sends.length})` : ""}</span> : inv.isBusiness !== false ? <span className="text-amber-500 font-medium">ממתין לשליחה</span> : null}
                       </div>
@@ -926,8 +930,8 @@ function SendDialog({
   const dates = invoices.map((i) => i.date).filter(Boolean).map((d) => new Date(d as string)).sort((a, b) => a.getTime() - b.getTime());
   const rangeText = dates.length
     ? dates[0].getTime() === dates[dates.length - 1].getTime()
-      ? `מתאריך ${fmtDate(dates[0])}`
-      : `מ-${fmtDate(dates[0])} עד ${fmtDate(dates[dates.length - 1])}`
+      ? `מתאריך ${fmtDay(dates[0])}`
+      : `מ-${fmtDay(dates[0])} עד ${fmtDay(dates[dates.length - 1])}`
     : "";
 
   const total = invoices.reduce((acc, i) => {

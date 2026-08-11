@@ -232,7 +232,7 @@ export default function UploadPage() {
                         {inv.date && (
                           <span className="flex items-center gap-1 text-muted-foreground">
                             <Calendar className="h-3 w-3" />
-                            {new Date(inv.date).toLocaleDateString("he-IL")}
+                            {new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}
                           </span>
                         )}
                         {inv.category && (

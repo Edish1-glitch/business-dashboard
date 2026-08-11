@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const dates = invoices
       .map((inv) => inv.date || inv.createdAt)
       .sort((a, b) => a.getTime() - b.getTime());
-    const fmt = (d: Date) => `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
+    const fmt = (d: Date) => `${d.getUTCDate()}-${d.getUTCMonth() + 1}-${d.getUTCFullYear()}`;
     const folderName = `${fmt(dates[0])}_${fmt(dates[dates.length - 1])}`;
     const zipName = `${folderName}.zip`;
 

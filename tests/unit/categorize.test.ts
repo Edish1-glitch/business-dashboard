@@ -83,7 +83,9 @@ describe("extractAmount", () => {
 });
 
 describe("extractDate", () => {
-  const ymd = (d: Date | null) => (d ? [d.getFullYear(), d.getMonth() + 1, d.getDate()] : null);
+  // Invoice dates are stored as midnight UTC (a tz-proof calendar day), so assert
+  // on the UTC components — local getters would drift by the runner's timezone.
+  const ymd = (d: Date | null) => (d ? [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()] : null);
 
   it("parses ISO dates first (unambiguous)", () => {
     expect(ymd(extractDate("Date: 2025-01-15"))).toEqual([2025, 1, 15]);
@@ -312,7 +314,7 @@ describe("extractInvoiceData (integration)", () => {
     expect(data.currency).toBe("ILS");
     expect(data.vendor).toBe("סופר פארם");
     expect(data.creditCardLast4).toBe("4321");
-    expect(data.date && [data.date.getFullYear(), data.date.getMonth() + 1, data.date.getDate()]).toEqual([2025, 3, 15]);
+    expect(data.date && [data.date.getUTCFullYear(), data.date.getUTCMonth() + 1, data.date.getUTCDate()]).toEqual([2025, 3, 15]);
   });
 
   it("pulls a full record from an international invoice", () => {
@@ -321,6 +323,6 @@ describe("extractInvoiceData (integration)", () => {
     expect(data.amount).toBe(20);
     expect(data.currency).toBe("USD");
     expect(data.category).toBe("תוכנה");
-    expect(data.date && data.date.getFullYear()).toBe(2025);
+    expect(data.date && data.date.getUTCFullYear()).toBe(2025);
   });
 });

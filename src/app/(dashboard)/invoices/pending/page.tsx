@@ -675,7 +675,7 @@ export default function PendingInvoicesPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                       {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                      {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL")}</span>}
+                      {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span>}
                       {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
                     </div>
                   </div>
@@ -801,7 +801,7 @@ export default function PendingInvoicesPage() {
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                         {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                        {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL")}</span>}
+                        {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span>}
                         {inv.creditCardLast4 && <span>· ****{inv.creditCardLast4}</span>}
                         {waitTime && <span className="text-amber-500">{waitTime}</span>}
                       </div>
@@ -835,7 +835,7 @@ export default function PendingInvoicesPage() {
                       <span className="font-bold text-[14px] truncate block">{inv.vendor || inv.fileName}</span>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10.5px] text-muted-foreground">
                         {inv.category && <span className={`px-2 py-0.5 rounded-full font-medium ${categoryColors[inv.category.name] || categoryColors["אחר"]}`}>{inv.category.name}</span>}
-                        {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL")}</span>}
+                        {inv.date && <span>{new Date(inv.date).toLocaleDateString("he-IL", { timeZone: "UTC" })}</span>}
                         {inv.isBusiness === false && <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> פרטי</span>}
                         {waitTime && <span className="text-amber-500">{waitTime}</span>}
                       </div>

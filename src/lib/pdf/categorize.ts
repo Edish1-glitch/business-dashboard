@@ -179,9 +179,16 @@ export function extractDate(text: string): Date | null {
   // A transaction date can't be in the future. Fuel receipts print a loyalty-
   // points expiry ("למימוש עד: 31/12/2027") that was being picked up instead of
   // the real date; rejecting future dates skips it and finds the transaction date.
-  const now = new Date();
-  const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+  const maxDate = new Date();
+  maxDate.setUTCDate(maxDate.getUTCDate() + 2);
   const notFuture = (d: Date) => d <= maxDate;
+  // Build the parsed calendar date as midnight UTC — NOT local time. An invoice
+  // date is a pure calendar day; using `new Date(y, m, d)` would anchor it to the
+  // server's timezone (UTC in prod, Asia/Jerusalem locally), so the same receipt
+  // got stored as a different UTC instant depending on where it was processed and
+  // then read back one day early. `Date.UTC` makes the stored value timezone-proof.
+  const mkDate = (year: number, monthIndex: number, day: number) =>
+    new Date(Date.UTC(year, monthIndex, day));
 
   // Year-first (ISO-style): 2025-01-15, 2025/01/15, 2025.01.15 — unambiguous, try first.
   // (Handling only dashes here meant '2025/02/08' fell through and was misread as 2008.)
@@ -190,7 +197,7 @@ export function extractDate(text: string): Date | null {
     const month = parseInt(m[2]);
     const day = parseInt(m[3]);
     if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      const d = new Date(year, month - 1, day);
+      const d = mkDate(year, month - 1, day);
       if (notFuture(d)) return d;
     }
   }
@@ -211,7 +218,7 @@ export function extractDate(text: string): Date | null {
     const day = parseInt(textMonthMatch1[2]);
     const year = parseInt(textMonthMatch1[3]);
     if (month && day >= 1 && day <= 31 && year >= 2000) {
-      return new Date(year, month - 1, day);
+      return mkDate(year, month - 1, day);
     }
   }
 
@@ -222,7 +229,7 @@ export function extractDate(text: string): Date | null {
     const month = monthNames[textMonthMatch2[2].toLowerCase()];
     const year = parseInt(textMonthMatch2[3]);
     if (month && day >= 1 && day <= 31 && year >= 2000) {
-      return new Date(year, month - 1, day);
+      return mkDate(year, month - 1, day);
     }
   }
 
@@ -237,7 +244,7 @@ export function extractDate(text: string): Date | null {
       const day = parseInt(hebrewMatch[1]);
       const year = parseInt(hebrewMatch[2]);
       if (day >= 1 && day <= 31) {
-        return new Date(year, month - 1, day);
+        return mkDate(year, month - 1, day);
       }
     }
   }
@@ -257,11 +264,11 @@ export function extractDate(text: string): Date | null {
 
       let candidate: Date | null = null;
       // If first number > 12, it must be DD/MM (Israeli format)
-      if (a > 12 && b >= 1 && b <= 12) candidate = new Date(year, b - 1, a);
+      if (a > 12 && b >= 1 && b <= 12) candidate = mkDate(year, b - 1, a);
       // If second number > 12, it must be MM/DD (US format)
-      else if (b > 12 && a >= 1 && a <= 12) candidate = new Date(year, a - 1, b);
+      else if (b > 12 && a >= 1 && a <= 12) candidate = mkDate(year, a - 1, b);
       // Ambiguous - default to DD/MM (Israeli)
-      else if (a >= 1 && a <= 31 && b >= 1 && b <= 12) candidate = new Date(year, b - 1, a);
+      else if (a >= 1 && a <= 31 && b >= 1 && b <= 12) candidate = mkDate(year, b - 1, a);
 
       if (candidate && notFuture(candidate)) return candidate;
     }

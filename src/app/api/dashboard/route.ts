@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     const monthlyData = Object.entries(byMonth)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, amount]) => ({
-        month: new Date(month + "-01").toLocaleDateString("he-IL", { month: "short", year: "2-digit" }),
+        month: new Date(month + "-01").toLocaleDateString("he-IL", { month: "short", year: "2-digit", timeZone: "UTC" }),
         amount: Math.round(amount * 100) / 100,
       }));
 
