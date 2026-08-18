@@ -3,7 +3,9 @@ import type { NextConfig } from "next";
 // Content-Security-Policy. 'unsafe-inline'/'unsafe-eval' on scripts are required
 // by Next's inline bootstrap (no nonce pipeline here) — but the real value is in
 // the rest: default-src 'self' blocks loading any external script/resource,
-// frame-ancestors 'none' stops clickjacking, form-action limits where forms post,
+// frame-ancestors 'self' stops cross-origin clickjacking while still letting our
+// own pages frame same-origin content (the HTML invoice preview iframe),
+// form-action limits where forms post,
 // object/base are locked down. Tuned for what the app actually loads:
 //   img  → self + data/blob + Google avatars (lh3.googleusercontent.com)
 //   frame/worker → self (the preview iframe and the service worker)
@@ -20,7 +22,7 @@ const csp = [
   "worker-src 'self'",
   "manifest-src 'self'",
   "form-action 'self' https://accounts.google.com",
-  "frame-ancestors 'none'",
+  "frame-ancestors 'self'",
   "base-uri 'self'",
   "object-src 'none'",
 ].join("; ");
