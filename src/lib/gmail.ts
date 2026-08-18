@@ -99,18 +99,33 @@ export async function getGmailClient(
   // Refresh when the access token is missing/unreadable or about to expire (5 min buffer)
   const expiresAt = emailAccount.tokenExpiresAt?.getTime() || 0;
   if (!accessToken || Date.now() > expiresAt - 5 * 60 * 1000) {
-    const { credentials } = await oauth2Client.refreshAccessToken();
-    oauth2Client.setCredentials(credentials);
+    try {
+      const { credentials } = await oauth2Client.refreshAccessToken();
+      oauth2Client.setCredentials(credentials);
 
-    // Re-encrypt tokens before storing
-    await prisma.emailAccount.update({
-      where: { id: emailAccount.id },
-      data: {
-        accessToken: credentials.access_token ? encryptToken(credentials.access_token) : undefined,
-        tokenExpiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
-        ...(credentials.refresh_token && { refreshToken: encryptToken(credentials.refresh_token) }),
-      },
-    });
+      // Re-encrypt tokens before storing; clear any stale reconnect flag now
+      // that the token has proven it still works.
+      await prisma.emailAccount.update({
+        where: { id: emailAccount.id },
+        data: {
+          accessToken: credentials.access_token ? encryptToken(credentials.access_token) : undefined,
+          tokenExpiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
+          ...(credentials.refresh_token && { refreshToken: encryptToken(credentials.refresh_token) }),
+          needsReconnect: false,
+        },
+      });
+    } catch (err) {
+      // Google rejected the refresh token (invalid_grant): revoked, or expired
+      // after ~6 months idle, or the user changed password / revoked access.
+      // Flag the account so the UI can prompt a reconnect instead of showing a
+      // misleading "connected" state, then rethrow for the caller to handle.
+      if (err instanceof Error && /invalid_grant/i.test(err.message)) {
+        await prisma.emailAccount
+          .update({ where: { id: emailAccount.id }, data: { needsReconnect: true } })
+          .catch(() => {});
+      }
+      throw err;
+    }
   }
 
   return google.gmail({ version: "v1", auth: oauth2Client });

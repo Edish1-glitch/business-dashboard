@@ -168,6 +168,7 @@ model EmailAccount {
   userId       String
   user         User     @relation(fields: [userId], references: [id])
   tokenExpiresAt DateTime?
+  needsReconnect Boolean  @default(false) // set when Google rejects the token (invalid_grant); cleared on successful refresh/reconnect
   lastSyncAt   DateTime?
   syncRanges   SyncRange[]
   invoices     Invoice[]

@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         refreshToken: encRefresh,
         tokenExpiresAt: expiresAt,
         scopes,
+        needsReconnect: false, // fresh tokens — clear the reconnect flag
       },
       create: {
         email,

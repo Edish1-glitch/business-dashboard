@@ -16,7 +16,7 @@ export async function GET() {
     prisma.user.findUnique({ where: { id: user.id }, select: { accountantEmail: true } }),
     prisma.emailAccount.findMany({
       where: { userId: user.id },
-      select: { id: true, email: true, scopes: true },
+      select: { id: true, email: true, scopes: true, needsReconnect: true },
       orderBy: { createdAt: "asc" },
     }),
   ]);
@@ -24,7 +24,10 @@ export async function GET() {
   const senderAccounts = accounts.map((a) => ({
     id: a.id,
     email: a.email,
-    canSend: canSendEmail(a.scopes),
+    // "can actually send right now" = send scope granted AND the token still
+    // works. needsReconnect is set when Google rejected the token (invalid_grant).
+    canSend: canSendEmail(a.scopes) && !a.needsReconnect,
+    needsReconnect: a.needsReconnect,
   }));
 
   return NextResponse.json({

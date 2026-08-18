@@ -57,6 +57,7 @@ function SettingsPage() {
   const [savingAccountant, setSavingAccountant] = useState(false);
   const [savedAccountant, setSavedAccountant] = useState(false);
   const [sendPermission, setSendPermission] = useState<Record<string, boolean>>({});
+  const [reconnectNeeded, setReconnectNeeded] = useState<Record<string, boolean>>({});
   const [syncFromDate, setSyncFromDate] = useState(new Date().getFullYear() + "-01-01");
   const [syncToDate, setSyncToDate] = useState(new Date().toISOString().split("T")[0]);
   const [showOverlapWarning, setShowOverlapWarning] = useState(false);
@@ -78,8 +79,13 @@ function SettingsPage() {
       .then((d) => {
         setAccountantEmail(d.accountantEmail || "");
         const perms: Record<string, boolean> = {};
-        for (const a of d.senderAccounts || []) perms[a.email] = a.canSend;
+        const reconnect: Record<string, boolean> = {};
+        for (const a of d.senderAccounts || []) {
+          perms[a.email] = a.canSend;
+          reconnect[a.email] = a.needsReconnect;
+        }
         setSendPermission(perms);
+        setReconnectNeeded(reconnect);
       })
       .catch(() => {});
   };
@@ -290,7 +296,11 @@ function SettingsPage() {
                         ? `סנכרון אחרון: ${new Date(account.lastSyncAt).toLocaleDateString("he-IL")}`
                         : "טרם סונכרן"}
                     </p>
-                    {sendPermission[account.email] ? (
+                    {reconnectNeeded[account.email] ? (
+                      <a href="/api/email-accounts/connect" className="text-[11px] text-red-600 font-medium hover:underline flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> החיבור ל-Gmail פג — חבר מחדש
+                      </a>
+                    ) : sendPermission[account.email] ? (
                       <p className="text-[11px] text-emerald-600 flex items-center gap-1">
                         <Send className="h-3 w-3" /> הרשאת שליחה פעילה
                       </p>
