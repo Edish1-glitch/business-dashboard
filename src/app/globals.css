@@ -191,18 +191,33 @@
   }
 
   /* Sticky top bar — real liquid glass: content refracts through the blur,
-     lit by a hairline top highlight + a soft glassy bottom edge. */
+     lit by a hairline top highlight + a soft glassy bottom edge.
+     The blur lives on a ::before layer BEHIND the content (not on the header
+     element itself) so the logo/bell/text stay crisp — putting backdrop-filter
+     on the same element that holds the content blurs that content on iOS Safari
+     (a sticky + backdrop-filter compositing bug). */
   .glass-header {
-    background: rgba(255, 255, 255, 0.55);
-    -webkit-backdrop-filter: blur(26px) saturate(180%);
-    backdrop-filter: blur(26px) saturate(180%);
+    isolation: isolate;
+    background: transparent;
     border-bottom: 1px solid rgba(255, 255, 255, 0.55);
     box-shadow: 0 6px 24px rgba(70, 60, 110, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
+  .glass-header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(26px) saturate(180%);
+    backdrop-filter: blur(26px) saturate(180%);
+    pointer-events: none;
+  }
   .dark .glass-header {
-    background: rgba(18, 18, 26, 0.5);
     border-bottom-color: rgba(255, 255, 255, 0.08);
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+  .dark .glass-header::before {
+    background: rgba(18, 18, 26, 0.5);
   }
 
   /* Floating glass bottom nav — genuinely translucent so the page refracts through */
