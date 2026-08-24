@@ -15,7 +15,9 @@ set -euo pipefail
 
 HOST="ubuntu@84.13.66.121"
 KEY="$HOME/.ssh/oracle_findash"
-URL="https://84.13.66.121.sslip.io"
+# Public URL (health check). The SSH host above stays a raw IP — DNS is only
+# for the public site, and we don't want deploys to depend on it resolving.
+URL="https://findashapp.com"
 
 echo "▶ Deploying latest main to Oracle ($HOST) …"
 ssh -i "$KEY" -o ConnectTimeout=20 "$HOST" 'bash ~/redeploy.sh'

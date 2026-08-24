@@ -13,7 +13,7 @@ FinDash מתחבר ל-Gmail שלך, מזהה חשבוניות לבד, ומרכז
   <img src="https://img.shields.io/badge/Prisma%207-PostgreSQL-4169e1?logo=postgresql&logoColor=white" alt="Prisma + PostgreSQL" />
 </p>
 
-🔗 **[לאפליקציה החיה »](https://84.13.66.121.sslip.io)**
+🔗 **[לאפליקציה החיה »](https://findashapp.com)**
 
 </div>
 
@@ -80,7 +80,7 @@ FinDash מתחבר ל-Gmail שלך, מזהה חשבוניות לבד, ומרכז
 
 ## 🔗 קישורים
 
-- **האפליקציה החיה:** https://84.13.66.121.sslip.io
+- **האפליקציה החיה:** https://findashapp.com
 - **הקוד:** נמצא כאן, ב-GitHub.
 
 ---
