@@ -28,7 +28,10 @@ RUN npx prisma generate
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
-# Build Next.js
+# Build Next.js. Give the build a large heap — `next build` type-checks + bundles
+# the whole app (incl. the MCP route's heavy googleapis/puppeteer import graph)
+# and OOMs under V8's default ceiling. The low runtime cap is restored below.
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # Create uploads directory
