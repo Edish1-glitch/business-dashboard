@@ -38,7 +38,8 @@ function redirectError(redirectUri: string, state: string | null, error: string,
   u.searchParams.set("error", error);
   u.searchParams.set("error_description", description);
   if (state) u.searchParams.set("state", state);
-  return Response.redirect(u.toString(), 302);
+  // 303 See Other: this follows a form POST, so the browser must GET the target.
+  return Response.redirect(u.toString(), 303);
 }
 
 function parseParams(url: URL): { params?: AuthParams; error?: string } {
@@ -153,5 +154,7 @@ export async function POST(req: Request) {
   const redir = new URL(redirectUri);
   redir.searchParams.set("code", code);
   if (state) redir.searchParams.set("state", state);
-  return Response.redirect(redir.toString(), 302);
+  // 303 See Other: this follows the consent form POST, so the browser must GET
+  // the connector's callback (POST→GET).
+  return Response.redirect(redir.toString(), 303);
 }

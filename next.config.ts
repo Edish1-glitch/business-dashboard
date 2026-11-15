@@ -74,7 +74,15 @@ const nextConfig: NextConfig = {
       // rule from ALSO matching the preview path — two matching rules would emit
       // duplicate CSP headers and the browser enforces their intersection, so the
       // strict img-src would win and undo the relaxation above.
-      { source: "/((?!api/invoices/.*/preview).*)", headers: securityHeaders(cspStrict) },
+      //
+      // Also excludes /api/mcp: those are OAuth/API endpoints, and the MCP OAuth
+      // consent page must be able to redirect the form to the connector's
+      // callback (e.g. https://claude.ai/api/mcp/auth_callback). The strict
+      // `form-action 'self' …` would make the browser block that cross-origin
+      // form redirect (fetch isn't subject to form-action, which is why a
+      // fetch POST worked but the real form submit failed). The consent HTML is
+      // fully server-controlled (no external scripts / user-injected markup).
+      { source: "/((?!api/invoices/.*/preview|api/mcp).*)", headers: securityHeaders(cspStrict) },
     ];
   },
 };
