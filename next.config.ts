@@ -55,6 +55,17 @@ function securityHeaders(csp: string) {
 
 const nextConfig: NextConfig = {
   poweredByHeader: false, // don't advertise the framework
+  // Serve the OAuth discovery documents at their standard /.well-known paths
+  // (Next ignores dot-prefixed app folders, so we map them to real routes).
+  // Both the root and the RFC 9728 path-scoped variants are covered.
+  async rewrites() {
+    return [
+      { source: "/.well-known/oauth-protected-resource", destination: "/api/mcp/metadata/protected-resource" },
+      { source: "/.well-known/oauth-protected-resource/:path*", destination: "/api/mcp/metadata/protected-resource" },
+      { source: "/.well-known/oauth-authorization-server", destination: "/api/mcp/metadata/authorization-server" },
+      { source: "/.well-known/oauth-authorization-server/:path*", destination: "/api/mcp/metadata/authorization-server" },
+    ];
+  },
   async headers() {
     return [
       // The invoice-preview endpoint gets a relaxed img-src (see cspPreview).

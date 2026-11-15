@@ -23,7 +23,13 @@ export default function LoginPage() {
 
         {/* Google Sign In */}
         <button
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          onClick={() => {
+            // Respect a same-origin callbackUrl (used by the MCP OAuth consent
+            // flow to return the user to the authorize endpoint after login).
+            // NextAuth restricts callbackUrl to the same origin, so this is safe.
+            const cb = new URLSearchParams(window.location.search).get("callbackUrl") || "/";
+            signIn("google", { callbackUrl: cb });
+          }}
           className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border border-border bg-card hover:bg-accent transition-colors text-sm font-medium"
           style={{ cursor: "pointer" }}
         >

@@ -14,6 +14,12 @@ export async function middleware(request: NextRequest) {
     pathname === "/tour" ||
     pathname === "/api/email-accounts/callback" ||
     pathname.startsWith("/api/cron") ||
+    // MCP remote server: bearer-authed endpoint, OAuth endpoints, signed file
+    // links, and public OAuth discovery metadata — never session-gated.
+    pathname.startsWith("/api/mcp") ||
+    pathname.startsWith("/.well-known/") ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
     pathname.startsWith("/icons")

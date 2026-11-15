@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useSyncContext } from "@/components/providers/SyncProvider";
 import { NotificationsSettings } from "@/components/settings/NotificationsSettings";
 import { DevicesSettings } from "@/components/settings/DevicesSettings";
+import { McpSettings } from "@/components/settings/McpSettings";
 
 interface Category {
   id: string;
@@ -513,6 +514,9 @@ function SettingsPage() {
 
       {/* Connected devices / sessions */}
       <DevicesSettings />
+
+      {/* MCP connections (personal assistant) + action log */}
+      <McpSettings />
 
       {/* Recently deleted (soft-delete trash) */}
       <button

@@ -191,3 +191,69 @@ model SyncRange {
 
   @@index([emailAccountId])
 }
+
+// ── MCP (Model Context Protocol) remote server: OAuth + audit ────────────────
+// Lets the claude.ai personal assistant connect to FinDash as a custom
+// connector. All additive; nothing here touches the existing app.
+
+// An OAuth client registered via Dynamic Client Registration (RFC 7591), e.g.
+// claude.ai. Public client (no secret) — security comes from PKCE.
+model McpClient {
+  id           String     @id @default(cuid()) // the OAuth client_id
+  name         String // client_name from registration
+  redirectUris String[] // allowed redirect URIs
+  createdAt    DateTime   @default(now())
+  tokens       McpToken[]
+}
+
+// Short-lived authorization code (PKCE authorization-code flow). Hashed at rest.
+model McpAuthCode {
+  id            String   @id @default(cuid())
+  codeHash      String   @unique // sha256 of the issued code
+  clientId      String
+  userId        String // the FinDash user who approved
+  redirectUri   String
+  codeChallenge String // PKCE S256 challenge
+  scope         String?
+  resource      String? // RFC 8707 resource indicator
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+// An issued access/refresh token pair (opaque, hashed at rest). One row per
+// active connector grant; revoking it disconnects that connector.
+model McpToken {
+  id               String    @id @default(cuid())
+  accessTokenHash  String    @unique
+  refreshTokenHash String?   @unique
+  clientId         String
+  client           McpClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId           String
+  scope            String?
+  resource         String?
+  label            String? // connector name, for the settings list
+  accessExpiresAt  DateTime
+  refreshExpiresAt DateTime?
+  revoked          Boolean   @default(false)
+  lastUsedAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+  @@index([clientId])
+}
+
+// Audit log: one row per MCP tool call (time, tool, param summary, outcome).
+model McpActionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  tool      String
+  summary   String // short, non-sensitive parameter summary
+  ok        Boolean
+  result    String? // short result or error summary
+  clientId  String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
