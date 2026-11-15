@@ -1,18 +1,21 @@
 name: Background Gmail sync
 
-# Triggers an incremental Gmail sync on the deployed app once a day in the
-# evening so new invoices are detected automatically and a push notification is
-# sent — without the user manually syncing. Authenticated with the CRON_SECRET
-# repo secret. (A user can still sync on demand from Settings at any time.)
+# Triggers an incremental Gmail sync on the deployed app every few hours so new
+# invoices are detected automatically (and a push notification is sent) without
+# the user manually syncing — and so a broken Gmail connection surfaces within
+# hours instead of silently dropping invoices for weeks. Authenticated with the
+# CRON_SECRET repo secret. (A user can still sync on demand from Settings.)
 #
-# 17:00 UTC = 20:00 Israel (IDT, summer) / 19:00 Israel (IST, winter) — evening
-# year-round. GitHub schedules run on UTC and may be delayed a few minutes.
+# Every 3 hours (00:00, 03:00, … UTC). Each run is incremental (uses each
+# account's lastSyncAt) so it's cheap; dedup is by SHA-256 of page bytes and the
+# split is byte-deterministic, so re-scanning the same window never re-imports.
+# GitHub schedules run on UTC and may be delayed a few minutes.
 #
 # Setup: add a repository secret named CRON_SECRET whose value matches the
 # CRON_SECRET env var of the deployed app (the Oracle VM's deploy/oracle/.env).
 on:
   schedule:
-    - cron: "0 17 * * *"
+    - cron: "0 */3 * * *"
   workflow_dispatch: {}
 
 jobs:

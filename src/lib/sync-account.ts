@@ -3,7 +3,7 @@ import { getGmailClient, searchEmails, getAttachments, getInlineInvoice, htmlToT
 import { processAndSave, splitPdfToPageBuffers } from "@/lib/invoice-processor";
 import { extractInvoiceData, isNegativeInvoice, hasInvoiceSignals } from "@/lib/pdf/categorize";
 import { R2_LIMITS } from "@/lib/r2";
-import type { NewInvoiceInfo } from "@/lib/notify";
+import { notifyGmailExpired, type NewInvoiceInfo } from "@/lib/notify";
 
 // R2 free tier: 10GB. Stop at the configured cap to leave buffer.
 const MAX_STORAGE_BYTES = R2_LIMITS.MAX_TOTAL_STORAGE;
@@ -45,6 +45,34 @@ export async function getStorageUsed(): Promise<number> {
         END
       ), 0)::float8 AS total FROM "Invoice"`;
   return Number(rows[0]?.total ?? 0);
+}
+
+/**
+ * Record a per-account sync failure for the mailbox-health view, and — only on
+ * the healthy→expired transition — fire a one-time reconnect alert (push + email
+ * + bell). Gating on the account's prior needsReconnect avoids re-alerting on
+ * every cron run while a mailbox stays expired. Never throws.
+ */
+async function recordAccountFailure(
+  userId: string,
+  account: { id: string; email: string; needsReconnect: boolean },
+  rawError: string,
+  needsReconnect: boolean
+): Promise<void> {
+  await prisma.emailAccount
+    .update({
+      where: { id: account.id },
+      data: {
+        lastError: rawError.slice(0, 500),
+        lastErrorAt: new Date(),
+        ...(needsReconnect && { needsReconnect: true }),
+      },
+    })
+    .catch(() => {});
+
+  if (needsReconnect && !account.needsReconnect) {
+    await notifyGmailExpired(userId, account).catch(() => {});
+  }
 }
 
 /**
@@ -94,6 +122,7 @@ export async function runSync(
     } catch (err) {
       const raw = err instanceof Error ? err.message : "שגיאה";
       const needsReconnect = /invalid_grant|invalid_token|unauthorized|לא מחובר/i.test(raw);
+      await recordAccountFailure(userId, account, raw, needsReconnect);
       failedAccounts.push({ email: account.email, reason: needsReconnect ? "החיבור פג — צריך לחבר מחדש" : raw, needsReconnect });
       progress(`⚠️ ${account.email}: ${needsReconnect ? "החיבור פג, צריך לחבר מחדש" : raw}`);
       continue;
@@ -105,6 +134,7 @@ export async function runSync(
     } catch (err) {
       const raw = err instanceof Error ? err.message : "שגיאה";
       const needsReconnect = /invalid_grant|invalid_token|unauthorized/i.test(raw);
+      await recordAccountFailure(userId, account, raw, needsReconnect);
       failedAccounts.push({ email: account.email, reason: needsReconnect ? "החיבור פג — צריך לחבר מחדש" : raw, needsReconnect });
       progress(`⚠️ שגיאה בחיפוש מיילים ב-${account.email}: ${raw}`);
       continue;

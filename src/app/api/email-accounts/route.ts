@@ -14,6 +14,9 @@ export async function GET() {
         email: true,
         provider: true,
         lastSyncAt: true,
+        needsReconnect: true,
+        lastError: true,
+        lastErrorAt: true,
         createdAt: true,
         syncRanges: {
           orderBy: { fromDate: "desc" },

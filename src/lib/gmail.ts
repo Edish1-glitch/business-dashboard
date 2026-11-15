@@ -103,8 +103,8 @@ export async function getGmailClient(
       const { credentials } = await oauth2Client.refreshAccessToken();
       oauth2Client.setCredentials(credentials);
 
-      // Re-encrypt tokens before storing; clear any stale reconnect flag now
-      // that the token has proven it still works.
+      // Re-encrypt tokens before storing; clear any stale reconnect flag and
+      // recorded error now that the token has proven it still works.
       await prisma.emailAccount.update({
         where: { id: emailAccount.id },
         data: {
@@ -112,6 +112,8 @@ export async function getGmailClient(
           tokenExpiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
           ...(credentials.refresh_token && { refreshToken: encryptToken(credentials.refresh_token) }),
           needsReconnect: false,
+          lastError: null,
+          lastErrorAt: null,
         },
       });
     } catch (err) {
@@ -121,7 +123,10 @@ export async function getGmailClient(
       // misleading "connected" state, then rethrow for the caller to handle.
       if (err instanceof Error && /invalid_grant/i.test(err.message)) {
         await prisma.emailAccount
-          .update({ where: { id: emailAccount.id }, data: { needsReconnect: true } })
+          .update({
+            where: { id: emailAccount.id },
+            data: { needsReconnect: true, lastError: err.message.slice(0, 500), lastErrorAt: new Date() },
+          })
           .catch(() => {});
       }
       throw err;

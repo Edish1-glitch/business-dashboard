@@ -5,6 +5,7 @@ import { LiquidBackground } from "@/components/layout/LiquidBackground";
 import { Onboarding } from "@/components/Onboarding";
 import { SyncFloatingWidget } from "@/components/SyncFloatingWidget";
 import { UploadFloatingWidget } from "@/components/UploadFloatingWidget";
+import { MailboxHealthBanner } from "@/components/MailboxHealthBanner";
 import { Toaster } from "sonner";
 
 export default function DashboardLayout({
@@ -19,7 +20,10 @@ export default function DashboardLayout({
       <div className="md:mr-64 min-h-screen flex flex-col">
         <Header />
         {/* pb-24 clears the mobile bottom tab bar */}
-        <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 pb-24 md:pb-8">{children}</main>
+        <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
+          <MailboxHealthBanner />
+          {children}
+        </main>
       </div>
       <SyncFloatingWidget />
       <UploadFloatingWidget />

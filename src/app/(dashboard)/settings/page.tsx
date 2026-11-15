@@ -27,6 +27,9 @@ interface EmailAccount {
   email: string;
   provider: string;
   lastSyncAt: string | null;
+  needsReconnect?: boolean;
+  lastError?: string | null;
+  lastErrorAt?: string | null;
   syncRanges?: SyncRangeInfo[];
 }
 
@@ -308,6 +311,11 @@ function SettingsPage() {
                       <a href="/api/email-accounts/connect" className="text-[11px] text-amber-600 hover:underline flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" /> אין הרשאת שליחה — חבר מחדש
                       </a>
+                    )}
+                    {account.lastError && (
+                      <p className="text-[11px] text-muted-foreground" title={account.lastError}>
+                        שגיאה אחרונה{account.lastErrorAt ? ` (${new Date(account.lastErrorAt).toLocaleDateString("he-IL")})` : ""}: {account.lastError.length > 60 ? account.lastError.slice(0, 60) + "…" : account.lastError}
+                      </p>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
